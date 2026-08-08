@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings — NazeerDFS Enterprise</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            DEFAULT: '#F97316',
+                            50: '#FFF7ED', 100: '#FFEDD5', 200: '#FED7AA', 300: '#FDBA74',
+                            400: '#FB923C', 500: '#F97316', 600: '#EA580C', 700: '#C2410C',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg: #F8FAFC;
+            --sidebar: #FFFFFF;
+            --card: #FFFFFF;
+            --surface2: #F1F5F9;
+            --border: #CBD5E1;
+            --text: #0F172A;
+            --text2: #475569;
+            --shadow-color: 15, 23, 42;
+        }
+
+        html.dark {
+            --bg: #0F172A;
+            --sidebar: #111827;
+            --card: #1E293B;
+            --surface2: #334155;
+            --border: #475569;
+            --text: #F8FAFC;
+            --text2: #CBD5E1;
+            --shadow-color: 0, 0, 0;
+        }
+
+        * {
+            transition: background-color 380ms ease, border-color 380ms ease, color 380ms ease, box-shadow 380ms ease;
+        }
+
+        html,
+        body {
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .bg-app {
+            background: var(--bg);
+        }
+
+        .bg-sidebar {
+            background: var(--sidebar);
+        }
+
+        .bg-card {
+            background: var(--card);
+        }
+
+        .bg-surface2 {
+            background: var(--surface2);
+        }
+
+        .border-app {
+            border-color: var(--border);
+        }
+
+        .text-app {
+            color: var(--text);
+        }
+
+        .text-app2 {
+            color: var(--text2);
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow: 0 1px 2px rgba(var(--shadow-color), 0.04), 0 8px 24px -12px rgba(var(--shadow-color), 0.12);
+            transition: transform 240ms cubic-bezier(.2, .8, .2, 1), box-shadow 240ms ease, background-color 380ms ease, border-color 380ms ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 12px rgba(var(--shadow-color), 0.06), 0 16px 40px -14px rgba(var(--shadow-color), 0.18);
+            transform: translateY(-2px);
+        }
+
+        .glass {
+            backdrop-filter: blur(20px) saturate(160%);
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            background: color-mix(in srgb, var(--card) 72%, transparent);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 8px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #F97316;
+        }
+
+        .nav-item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            color: var(--text2);
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 200ms ease;
+        }
+
+        .nav-item:hover {
+            background: var(--surface2);
+            color: var(--text);
+            transform: translateX(2px);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.14), rgba(249, 115, 22, 0.06));
+            color: #F97316;
+        }
+
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: -14px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 22px;
+            background: #F97316;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .nav-item i {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeInUp 560ms cubic-bezier(.2, .8, .2, 1) both;
+        }
+
+        @keyframes pulseDot {
+            0% {
+                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.55);
+            }
+
+            70% {
+                box-shadow: 0 0 0 8px rgba(249, 115, 22, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+            }
+        }
+
+        .pulse-dot {
+            animation: pulseDot 2s infinite;
+        }
+
+        .ripple {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ripple-effect {
+            position: absolute;
+            border-radius: 50%;
+            transform: scale(0);
+            background: rgba(255, 255, 255, 0.5);
+            animation: rippleAnim 600ms ease-out;
+            pointer-events: none;
+        }
+
+        @keyframes rippleAnim {
+            to {
+                transform: scale(3);
+                opacity: 0;
+            }
+        }
+
+        .progress-fill {
+            transition: width 900ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        #sidebar {
+            transition: transform 320ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .toggle-track {
+            transition: background-color 380ms ease;
+        }
+
+        .toggle-thumb {
+            transition: transform 380ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        @media (max-width: 1024px) {
+            #sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+                z-index: 40;
+                height: 100vh;
+            }
+
+            #sidebar.open {
+                transform: translateX(0);
+            }
+        }
+
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        input:focus,
+        button:focus-visible,
+        select:focus,
+        a:focus-visible {
+            outline: 2px solid #F97316;
+            outline-offset: 2px;
+        }
+
+        /* Settings Vertical Tab Active State */
+        .settings-tab-btn.active {
+            background-color: var(--surface2);
+            color: #F97316;
+            font-weight: 600;
+            border-left: 3px solid #F97316;
+        }
+
+        /* Toggle switch component styling */
+        .switch-input:checked+.switch-slider {
+            background-color: #F97316;
+        }
+
+        .switch-input:checked+.switch-slider::before {
+            transform: translateX(20px);
+        }
+    </style>
+</head>
+
+<body class="bg-app text-app font-sans antialiased min-h-screen">
+
+    <div id="overlay" class="fixed inset-0 bg-black/40 z-30 hidden lg:hidden"></div>
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="w-[280px] bg-sidebar border-r border-app fixed top-0 left-0 h-screen flex flex-col z-40">
+        <div class="h-[72px] flex items-center gap-3 px-6 border-b border-app flex-shrink-0">
+            <div
+                class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
+                <i data-lucide="hexagon" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="leading-tight">
+                <p class="font-bold text-[15px] tracking-tight">NazeerDFS</p>
+                <p class="text-[11px] text-app2">Enterprise Distributed Storage</p>
+            </div>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto px-4 py-5 space-y-1 scrollbar-thin">
+            <p class="px-3 text-[11px] font-semibold uppercase tracking-wider text-app2 mb-2">Workspace</p>
+            <a href="dashboard.html" class="nav-item" data-page="dashboard"><i
+                    data-lucide="layout-dashboard"></i>Dashboard</a>
+            <a href="files.html" class="nav-item" data-page="files"><i data-lucide="folder"></i>My Files</a>
+            <a href="upload.html" class="nav-item" data-page="upload"><i data-lucide="upload-cloud"></i>Upload Center</a>
+            <a href="nodes.html" class="nav-item" data-page="nodes"><i data-lucide="server"></i>Storage Nodes</a>
+            <a href="cluster.html" class="nav-item" data-page="cluster"><i data-lucide="globe"></i>Cluster Monitor</a>
+            <a href="settings.html" class="nav-item active" data-page="settings"><i data-lucide="settings"></i>Settings</a>
+        </nav>
+
+        <div class="px-4 pb-4">
+            <div class="card !rounded-2xl p-4 mb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-app2">Storage Used</span>
+                    <span class="text-xs font-semibold text-brand-500">61%</span>
+                </div>
+                <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
+                    <div id="sidebarStorageBar"
+                        class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill"
+                        style="width:0%"></div>
+                </div>
+                <p class="text-[11px] text-app2 mt-2">7.3 TB of 12 TB used</p>
+            </div>
+            <p class="text-[11px] text-app2 text-center mb-3">Version 1.0.4</p>
+        </div>
+
+        <div class="border-t border-app p-4 flex items-center gap-3">
+            <img src="https://api.dicebear.com/7.x/notionists/svg?seed=Arjun"
+                class="w-9 h-9 rounded-full bg-surface2 flex-shrink-0" alt="User avatar">
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold truncate">Arjun Nazeer</p>
+                <p class="text-[11px] text-app2 truncate">Cluster Admin</p>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-app2 flex-shrink-0"></i>
+        </div>
+    </aside>
+
+    <!-- MAIN WRAPPER -->
+    <div class="lg:ml-[280px]">
+
+        <!-- NAVBAR -->
+        <header
+            class="h-[72px] bg-sidebar/90 glass border-b border-app fixed top-0 right-0 left-0 lg:left-[280px] z-20 flex items-center px-4 md:px-6 gap-4">
+            <button id="menuBtn" class="lg:hidden p-2 rounded-lg hover:bg-surface2">
+                <i data-lucide="menu" class="w-5 h-5"></i>
+            </button>
+
+            <div class="flex-shrink-0 hidden md:block">
+                <h1 class="text-[15px] font-semibold">Settings</h1>
+            </div>
+
+            <div class="flex-1 max-w-xl mx-auto hidden sm:block">
+                <div class="relative">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-app2"></i>
+                    <input type="text" id="globalNavSearch" placeholder="Search settings, preferences, keys..."
+                        class="w-full bg-surface2 border border-app rounded-xl pl-10 pr-4 py-2 text-sm placeholder:text-app2 focus:bg-card outline-none">
+                    <kbd
+                        class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] px-1.5 py-0.5 rounded border border-app text-app2 hidden md:block">⌘K</kbd>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 ml-auto">
+                <button id="themeToggle"
+                    class="relative w-[52px] h-[28px] rounded-full toggle-track bg-surface2 border border-app flex items-center px-1"
+                    aria-label="Toggle theme">
+                    <span id="toggleThumb"
+                        class="toggle-thumb w-[20px] h-[20px] rounded-full bg-white shadow flex items-center justify-center">
+                        <i data-lucide="moon" id="toggleIcon" class="w-3 h-3 text-slate-700"></i>
+                    </span>
+                </button>
+
+                <button class="relative p-2.5 rounded-xl hover:bg-surface2" aria-label="Notifications">
+                    <i data-lucide="bell" class="w-[18px] h-[18px]"></i>
+                    <span class="pulse-dot absolute top-2 right-2 w-2 h-2 bg-brand-500 rounded-full"></span>
+                </button>
+
+                <div class="relative">
+                    <button id="profileBtn" class="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-surface2">
+                        <img src="https://api.dicebear.com/7.x/notionists/svg?seed=Arjun"
+                            class="w-8 h-8 rounded-full bg-surface2" alt="Profile">
+                        <i data-lucide="chevron-down" class="w-4 h-4 text-app2 hidden md:block"></i>
+                    </button>
+                    <div id="profileDropdown" class="hidden absolute right-0 mt-2 w-52 card p-1.5 text-sm z-50">
+                        <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                                data-lucide="user" class="w-4 h-4"></i>Profile</a>
+                        <a href="settings.html" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                                data-lucide="settings" class="w-4 h-4"></i>Settings</a>
+                        <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                                data-lucide="key" class="w-4 h-4"></i>API Keys</a>
+                        <div class="h-px bg-app my-1"></div>
+                        <a href="#"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2 text-red-500"><i
+                                data-lucide="log-out" class="w-4 h-4"></i>Sign out</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="pt-[72px] px-4 md:px-8 pb-16 max-w-[1600px] mx-auto">
+
+            <!-- PAGE HEADER -->
+            <section class="fade-in mt-6 mb-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-semibold text-brand-500 uppercase tracking-wider">System Administration</span>
+                            <span class="text-app2">•</span>
+                            <span class="text-xs text-app2">Global Platform Config</span>
+                        </div>
+                        <h2 class="text-2xl md:text-3xl font-bold tracking-tight">Settings</h2>
+                        <p class="text-app2 text-sm mt-1">Configure your distributed storage platform, account preferences and cluster behavior.</p>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button id="exportConfigBtn"
+                            class="ripple flex items-center gap-2 bg-surface2 hover:bg-surface2/80 text-app border border-app font-medium text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm">
+                            <i data-lucide="download" class="w-4 h-4 text-brand-500"></i>
+                            <span>Export Configuration</span>
+                        </button>
+
+                        <button id="saveSettingsBtn"
+                            class="ripple flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-medium text-sm px-5 py-2.5 rounded-xl shadow-lg shadow-brand-500/25 transition-all">
+                            <i data-lucide="save" class="w-4 h-4"></i>
+                            <span>Save Changes</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SETTINGS LAYOUT: MENU (Left) + PANEL (Center) + SUMMARY (Right) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                <!-- LEFT SETTINGS NAVIGATION MENU (3 Cols on LG) -->
+                <div class="lg:col-span-3">
+                    <div class="card p-2 space-y-1 fade-in" style="animation-delay:60ms">
+                        <button class="settings-tab-btn active w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-medium flex items-center gap-2.5 transition-all" data-tab="general">
+                            <i data-lucide="sliders" class="w-4 h-4"></i> General
+                        </button>
+                        <button class="settings-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-medium text-app2 hover:bg-surface2 hover:text-app flex items-center gap-2.5 transition-all" data-tab="account">
+                            <i data-lucide="user" class="w-4 h-4"></i> Account
+                        </button>
+                        <button class="settings-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-medium text-app2 hover:bg-surface2 hover:text-app flex items-center gap-2.5 transition-all" data-tab="appearance">
+                            <i data-lucide="palette" class="w-4 h-4"></i> Appearance
+                        </button>
+                        <button class="settings-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-medium text-app2 hover:bg-surface2 hover:text-app flex items-center gap-2.5 transition-all" data-tab="storage">
+                            <i data-lucide="hard-drive" class="w-4 h-4"></i> Storage
+                        </button>
+                        <button class="settings-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-medium text-app2 hover:bg-surface2 hover:text-app flex items-center gap-2.5 transition-all" data-tab="replication">
+                            <i data-lucide="copy" class="w-4 h-4"></i> Replication
+                        </button>
+                        <button class="settings-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-medium text-app2 hover:bg-surface2 hover:text-app flex items-center gap-2.5 transition-all" data-tab="security">
+                            <i data-lucide="shield-check" class="w-4 h-4"></i> Security
+                        </button>
+                        <button class="settings-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-medium text-app2 hover:bg-surface2 hover:text-app flex items-center gap-2.5 transition-all" data-tab="notifications">
+                            <i data-lucide="bell" class="w-4 h-4"></i> Notifications
+                        </button>
+                        <button class="settings-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-medium text-app2 hover:bg-surface2 hover:text-app flex items-center gap-2.5 transition-all" data-tab="cluster">
+                            <i data-lucide="cpu" class="w-4 h-4"></i> Cluster
+                        </button>
+                        <button class="settings-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-medium text-app2 hover:bg-surface2 hover:text-app flex items-center gap-2.5 transition-all" data-tab="api">
+                            <i data-lucide="code-2" class="w-4 h-4"></i> API & Webhooks
+                        </button>
+                        <button class="settings-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-medium text-app2 hover:bg-surface2 hover:text-app flex items-center gap-2.5 transition-all" data-tab="about">
+                            <i data-lucide="info" class="w-4 h-4"></i> About NazeerDFS
+                        </button>
+                    </div>
+                </div>
+
+                <!-- CENTER SETTINGS PANEL CONTENT (6 Cols on LG) -->
+                <div class="lg:col-span-6 space-y-6">
+
+                    <!-- TAB 1: GENERAL -->
+                    <div id="panel-general" class="settings-panel card p-6 space-y-6 fade-in">
+                        <div>
+                            <h3 class="text-base font-bold mb-1">General Settings</h3>
+                            <p class="text-xs text-app2">Manage global system parameters and workspace defaults.</p>
+                        </div>
+                        <div class="space-y-4 text-xs">
+                            <div>
+                                <label class="block font-semibold text-app2 mb-1">System Identifier Name</label>
+                                <input type="text" value="NazeerDFS Enterprise Cluster" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-medium">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-app2 mb-1">Default Workspace Root</label>
+                                <input type="text" value="/data/nazeerdfs/cluster_vol0" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-mono">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block font-semibold text-app2 mb-1">Default Language</label>
+                                    <select class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none">
+                                        <option>English (US)</option>
+                                        <option>Spanish</option>
+                                        <option>French</option>
+                                        <option>German</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-app2 mb-1">Timezone</label>
+                                    <select class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none">
+                                        <option>UTC (Coordinated Universal Time)</option>
+                                        <option>America/New_York (EST)</option>
+                                        <option>Asia/Kolkata (IST)</option>
+                                        <option>Europe/London (GMT)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="pt-2 flex items-center justify-between">
+                                <div>
+                                    <p class="font-semibold">Automated Metadata Backup</p>
+                                    <p class="text-[11px] text-app2">Snapshot Raft metadata every 24 hours.</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" checked class="sr-only switch-input">
+                                    <div class="w-10 h-5 bg-surface2 border border-app rounded-full switch-slider relative transition-colors before:content-[''] before:absolute before:top-0.5 before:left-0.5 before:w-4 before:h-4 before:bg-white before:rounded-full before:transition-transform"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: ACCOUNT -->
+                    <div id="panel-account" class="settings-panel hidden card p-6 space-y-6 fade-in">
+                        <div>
+                            <h3 class="text-base font-bold mb-1">Account & Profile</h3>
+                            <p class="text-xs text-app2">Manage your administrative credentials and security options.</p>
+                        </div>
+                        <div class="flex items-center gap-4 pb-4 border-b border-app">
+                            <img src="https://api.dicebear.com/7.x/notionists/svg?seed=Arjun" class="w-16 h-16 rounded-2xl bg-surface2 p-1 border border-app" alt="Avatar">
+                            <div>
+                                <h4 class="font-bold text-sm">Arjun Nazeer</h4>
+                                <p class="text-xs text-brand-500 font-semibold">Cluster Administrator</p>
+                                <button class="mt-2 text-[11px] px-3 py-1 rounded-lg bg-surface2 hover:bg-surface2/80 border border-app font-medium">Change Avatar</button>
+                            </div>
+                        </div>
+                        <div class="space-y-4 text-xs">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block font-semibold text-app2 mb-1">Full Name</label>
+                                    <input type="text" value="Arjun Nazeer" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none">
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-app2 mb-1">Email Address</label>
+                                    <input type="email" value="arjun@nazeerdfs.io" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block font-semibold text-app2 mb-1">Role</label>
+                                    <input type="text" value="Cluster Admin" disabled class="w-full bg-surface2/50 border border-app rounded-xl p-2.5 outline-none font-semibold text-brand-500 opacity-80 cursor-not-allowed">
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-app2 mb-1">Organization</label>
+                                    <input type="text" value="Nazeer Systems Corp" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none">
+                                </div>
+                            </div>
+                            <div class="pt-2 border-t border-app">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="font-semibold">Two-Factor Authentication (2FA)</p>
+                                        <p class="text-[11px] text-app2">Secured via TOTP Authenticator App.</p>
+                                    </div>
+                                    <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold text-emerald-500 bg-emerald-500/10">Enabled</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: APPEARANCE -->
+                    <div id="panel-appearance" class="settings-panel hidden card p-6 space-y-6 fade-in">
+                        <div>
+                            <h3 class="text-base font-bold mb-1">Appearance & Theme</h3>
+                            <p class="text-xs text-app2">Customize the visual interface and display preferences.</p>
+                        </div>
+                        <div class="space-y-5 text-xs">
+                            <div>
+                                <label class="block font-semibold text-app2 mb-2">Theme Mode</label>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <button onclick="document.getElementById('themeToggle').click()" class="p-4 rounded-2xl border border-app bg-surface2/50 hover:border-brand-500 text-left flex items-center justify-between">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="moon" class="w-4 h-4 text-brand-500"></i>
+                                            <span class="font-semibold">Dark Mode</span>
+                                        </div>
+                                        <span class="text-[10px] text-app2 font-mono">Active</span>
+                                    </button>
+                                    <button onclick="document.getElementById('themeToggle').click()" class="p-4 rounded-2xl border border-app bg-surface2/50 hover:border-brand-500 text-left flex items-center justify-between">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="sun" class="w-4 h-4 text-amber-500"></i>
+                                            <span class="font-semibold">Light Mode</span>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold text-app2 mb-2">Primary Accent Color</label>
+                                <div class="flex items-center gap-3">
+                                    <button class="w-8 h-8 rounded-full bg-[#F97316] ring-2 ring-offset-2 ring-[#F97316]"></button>
+                                    <button class="w-8 h-8 rounded-full bg-[#10B981] hover:scale-105 transition-transform"></button>
+                                    <button class="w-8 h-8 rounded-full bg-[#3B82F6] hover:scale-105 transition-transform"></button>
+                                    <button class="w-8 h-8 rounded-full bg-[#8B5CF6] hover:scale-105 transition-transform"></button>
+                                </div>
+                            </div>
+
+                            <div class="space-y-3 pt-2">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="font-semibold">Compact Table Mode</p>
+                                        <p class="text-[11px] text-app2">Reduces row padding in file & node tables.</p>
+                                    </div>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" class="sr-only switch-input">
+                                        <div class="w-10 h-5 bg-surface2 border border-app rounded-full switch-slider relative transition-colors before:content-[''] before:absolute before:top-0.5 before:left-0.5 before:w-4 before:h-4 before:bg-white before:rounded-full before:transition-transform"></div>
+                                    </label>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="font-semibold">Interface Animations</p>
+                                        <p class="text-[11px] text-app2">Enable smooth fade-ins and card hover lifts.</p>
+                                    </div>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" checked class="sr-only switch-input">
+                                        <div class="w-10 h-5 bg-surface2 border border-app rounded-full switch-slider relative transition-colors before:content-[''] before:absolute before:top-0.5 before:left-0.5 before:w-4 before:h-4 before:bg-white before:rounded-full before:transition-transform"></div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 4: STORAGE -->
+                    <div id="panel-storage" class="settings-panel hidden card p-6 space-y-6 fade-in">
+                        <div>
+                            <h3 class="text-base font-bold mb-1">Storage Management</h3>
+                            <p class="text-xs text-app2">Configure chunking, compression, and capacity limits.</p>
+                        </div>
+                        <div class="space-y-4 text-xs">
+                            <div>
+                                <label class="block font-semibold text-app2 mb-1">Default Storage Node</label>
+                                <select class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-medium">
+                                    <option>Node 3000 (Primary Leader)</option>
+                                    <option>Node 4000 (Backup Mirror)</option>
+                                    <option>Node 5000 (High-Speed SSD)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-app2 mb-1">Chunk Compression Algorithm</label>
+                                <select class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none">
+                                    <option>ZSTD (Recommended - High Speed)</option>
+                                    <option>GZIP Level 6</option>
+                                    <option>LZ4 Ultra Low Latency</option>
+                                    <option>None (Raw Storage)</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block font-semibold text-app2 mb-1">Max Upload Limit</label>
+                                    <input type="text" value="10 GB per file" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-mono">
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-app2 mb-1">Quota Warning Threshold</label>
+                                    <input type="text" value="80%" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-mono">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 5: REPLICATION -->
+                    <div id="panel-replication" class="settings-panel hidden card p-6 space-y-6 fade-in">
+                        <div>
+                            <h3 class="text-base font-bold mb-1">Replication Policy</h3>
+                            <p class="text-xs text-app2">Fault tolerance, shard distribution, and mirroring strategy.</p>
+                        </div>
+                        <div class="space-y-4 text-xs">
+                            <div>
+                                <label class="block font-semibold text-app2 mb-1">Cluster Replication Factor</label>
+                                <select class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-semibold text-brand-500">
+                                    <option>3x Replicas (Recommended for High Availability)</option>
+                                    <option>2x Replicas</option>
+                                    <option>1x Single Node (No Redundancy)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-app2 mb-1">Chunk Size Allocation</label>
+                                <input type="text" value="64 MB Chunks" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-mono">
+                            </div>
+                            <div class="flex items-center justify-between pt-2">
+                                <div>
+                                    <p class="font-semibold">Automatic Multi-AZ Replication</p>
+                                    <p class="text-[11px] text-app2">Replicate chunks across distinct availability zones automatically.</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" checked class="sr-only switch-input">
+                                    <div class="w-10 h-5 bg-surface2 border border-app rounded-full switch-slider relative transition-colors before:content-[''] before:absolute before:top-0.5 before:left-0.5 before:w-4 before:h-4 before:bg-white before:rounded-full before:transition-transform"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 6: SECURITY -->
+                    <div id="panel-security" class="settings-panel hidden card p-6 space-y-6 fade-in">
+                        <div>
+                            <h3 class="text-base font-bold mb-1">Security & Encryption</h3>
+                            <p class="text-xs text-app2">Enterprise cluster data-at-rest and transit encryption settings.</p>
+                        </div>
+                        <div class="space-y-4 text-xs">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="font-semibold">AES-256-GCM Data Encryption</p>
+                                    <p class="text-[11px] text-app2">Encrypt file chunks before writing to physical disk.</p>
+                                </div>
+                                <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold text-emerald-500 bg-emerald-500/10">Active</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="font-semibold">Enforce TLS 1.3 In-Transit</p>
+                                    <p class="text-[11px] text-app2">Require SSL/TLS for all node-to-node communications.</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" checked class="sr-only switch-input">
+                                    <div class="w-10 h-5 bg-surface2 border border-app rounded-full switch-slider relative transition-colors before:content-[''] before:absolute before:top-0.5 before:left-0.5 before:w-4 before:h-4 before:bg-white before:rounded-full before:transition-transform"></div>
+                                </label>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-app2 mb-1">Admin Session Timeout</label>
+                                <select class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none">
+                                    <option>60 Minutes (Recommended)</option>
+                                    <option>30 Minutes</option>
+                                    <option>24 Hours</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 7: NOTIFICATIONS -->
+                    <div id="panel-notifications" class="settings-panel hidden card p-6 space-y-6 fade-in">
+                        <div>
+                            <h3 class="text-base font-bold mb-1">Notification Preferences</h3>
+                            <p class="text-xs text-app2">Configure alert triggers and real-time monitoring webhooks.</p>
+                        </div>
+                        <div class="space-y-3 text-xs">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="font-semibold">Email Alerts on Node Failure</p>
+                                    <p class="text-[11px] text-app2">Notify admins if any storage node goes offline.</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" checked class="sr-only switch-input">
+                                    <div class="w-10 h-5 bg-surface2 border border-app rounded-full switch-slider relative transition-colors before:content-[''] before:absolute before:top-0.5 before:left-0.5 before:w-4 before:h-4 before:bg-white before:rounded-full before:transition-transform"></div>
+                                </label>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="font-semibold">Replication Delay Warnings</p>
+                                    <p class="text-[11px] text-app2">Alert when sync latency exceeds 500ms.</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" checked class="sr-only switch-input">
+                                    <div class="w-10 h-5 bg-surface2 border border-app rounded-full switch-slider relative transition-colors before:content-[''] before:absolute before:top-0.5 before:left-0.5 before:w-4 before:h-4 before:bg-white before:rounded-full before:transition-transform"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 8: CLUSTER -->
+                    <div id="panel-cluster" class="settings-panel hidden card p-6 space-y-6 fade-in">
+                        <div>
+                            <h3 class="text-base font-bold mb-1">Cluster Engine Settings</h3>
+                            <p class="text-xs text-app2">Raft consensus, heartbeat timers, and leader election parameters.</p>
+                        </div>
+                        <div class="space-y-4 text-xs">
+                            <div>
+                                <label class="block font-semibold text-app2 mb-1">Cluster Mesh Name</label>
+                                <input type="text" value="nazeer-us-east-1" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-mono">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block font-semibold text-app2 mb-1">Heartbeat Interval</label>
+                                    <input type="text" value="2000 ms" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-mono">
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-app2 mb-1">Health Check Frequency</label>
+                                    <input type="text" value="5 sec" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-mono">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 9: API -->
+                    <div id="panel-api" class="settings-panel hidden card p-6 space-y-6 fade-in">
+                        <div>
+                            <h3 class="text-base font-bold mb-1">API & Integration Keys</h3>
+                            <p class="text-xs text-app2">Access REST API tokens and incoming webhooks.</p>
+                        </div>
+                        <div class="space-y-4 text-xs">
+                            <div>
+                                <label class="block font-semibold text-app2 mb-1">Production API Key</label>
+                                <div class="flex gap-2">
+                                    <input type="password" id="apiKeyInput" value="nzk_live_98f4a2190b2e3158c67a3f12" readonly class="flex-1 bg-surface2 border border-app rounded-xl p-2.5 outline-none font-mono text-app2">
+                                    <button id="toggleKeyVisibilityBtn" class="px-3 py-2.5 rounded-xl bg-surface2 border border-app hover:bg-surface2/80 font-medium">Show</button>
+                                    <button id="copyApiKeyBtn" class="px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold">Copy</button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-app2 mb-1">Webhook Endpoint URL</label>
+                                <input type="text" value="https://api.nazeerdfs.io/webhooks/v1/ingest" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-mono">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 10: ABOUT -->
+                    <div id="panel-about" class="settings-panel hidden card p-6 space-y-6 fade-in">
+                        <div>
+                            <h3 class="text-base font-bold mb-1">About NazeerDFS Enterprise</h3>
+                            <p class="text-xs text-app2">High-throughput fault-tolerant distributed file storage engine.</p>
+                        </div>
+                        <div class="card p-4 divide-y divide-app text-xs">
+                            <div class="py-2 flex justify-between">
+                                <span class="text-app2">Platform Version</span>
+                                <span class="font-mono font-bold text-brand-500">v1.0.4 Enterprise</span>
+                            </div>
+                            <div class="py-2 flex justify-between">
+                                <span class="text-app2">Build Tag</span>
+                                <span class="font-mono">2026.07.28-RELEASE</span>
+                            </div>
+                            <div class="py-2 flex justify-between">
+                                <span class="text-app2">License</span>
+                                <span class="font-semibold text-emerald-500">Enterprise Commercial</span>
+                            </div>
+                            <div class="py-2 flex justify-between">
+                                <span class="text-app2">Developed By</span>
+                                <span class="font-semibold">NazeerDFS Core Team</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DANGER ZONE CARD (Bottom of Center Col) -->
+                    <div class="card p-6 border-red-500/30 bg-red-500/5 fade-in" style="animation-delay:120ms">
+                        <div class="flex items-center gap-2 text-red-500 mb-2">
+                            <i data-lucide="alert-octagon" class="w-5 h-5"></i>
+                            <h3 class="font-bold text-sm">Danger Zone</h3>
+                        </div>
+                        <p class="text-xs text-app2 mb-4">Irreversible cluster management actions. Exercise extreme caution.</p>
+
+                        <div class="flex flex-wrap items-center gap-3">
+                            <button id="resetSettingsBtn" class="px-3.5 py-2 rounded-xl bg-surface2 hover:bg-surface2/80 text-xs font-semibold text-app border border-app">Reset Settings</button>
+                            <button id="resetClusterDemoBtn" class="px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-xs font-semibold text-red-500 border border-red-500/20">Reset Cluster (Demo)</button>
+                            <button id="deleteAccountDemoBtn" class="px-3.5 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-semibold shadow-md shadow-red-500/20">Delete Account</button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- RIGHT SIDEBAR SUMMARY PANEL (3 Cols on LG) -->
+                <div class="lg:col-span-3 space-y-6">
+
+                    <!-- QUICK INFO CARD -->
+                    <div class="card p-5 fade-in" style="animation-delay:180ms">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="info" class="w-4 h-4 text-brand-500"></i>
+                            <h3 class="font-bold text-sm">Quick Information</h3>
+                        </div>
+
+                        <div class="space-y-3 text-xs">
+                            <div class="p-3 rounded-xl bg-surface2/60 border border-app">
+                                <span class="text-app2 text-[11px] block">Storage Usage</span>
+                                <span class="font-bold text-app">7.3 TB / 12 TB (61%)</span>
+                                <div class="w-full h-1.5 rounded-full bg-surface2 overflow-hidden mt-1.5">
+                                    <div class="h-full bg-brand-500 rounded-full" style="width: 61%"></div>
+                                </div>
+                            </div>
+
+                            <div class="p-3 rounded-xl bg-surface2/60 border border-app flex justify-between items-center">
+                                <span class="text-app2">Cluster Status</span>
+                                <span class="text-emerald-500 font-semibold flex items-center gap-1">
+                                    <span class="status-dot bg-emerald-500 pulse-dot"></span> Operational
+                                </span>
+                            </div>
+
+                            <div class="p-3 rounded-xl bg-surface2/60 border border-app flex justify-between items-center">
+                                <span class="text-app2">Current User</span>
+                                <span class="font-semibold text-brand-500">Arjun Nazeer</span>
+                            </div>
+
+                            <div class="p-3 rounded-xl bg-surface2/60 border border-app flex justify-between items-center">
+                                <span class="text-app2">Current Theme</span>
+                                <span id="summaryThemeText" class="font-semibold">Dark Mode</span>
+                            </div>
+
+                            <div class="p-3 rounded-xl bg-surface2/60 border border-app flex justify-between items-center">
+                                <span class="text-app2">Version</span>
+                                <span class="font-mono text-app2">v1.0.4 Enterprise</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- FOOTER -->
+            <footer class="text-center text-[11px] text-app2 pt-10 pb-4">
+                NazeerDFS Enterprise · Global Distributed Cluster Settings & Administrative Portal
+            </footer>
+
+        </main>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        lucide.createIcons();
+
+        /* ---------------- THEME INITIALIZATION ---------------- */
+        const root = document.documentElement;
+        const themeToggle = document.getElementById('themeToggle');
+        const toggleThumb = document.getElementById('toggleThumb');
+        const toggleIconEl = document.getElementById('toggleIcon');
+        const summaryThemeText = document.getElementById('summaryThemeText');
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                root.classList.add('dark');
+                toggleThumb.style.transform = 'translateX(24px)';
+                toggleIconEl.setAttribute('data-lucide', 'moon');
+                if (summaryThemeText) summaryThemeText.textContent = 'Dark Mode';
+            } else {
+                root.classList.remove('dark');
+                toggleThumb.style.transform = 'translateX(0px)';
+                toggleIconEl.setAttribute('data-lucide', 'sun');
+                if (summaryThemeText) summaryThemeText.textContent = 'Light Mode';
+            }
+            lucide.createIcons();
+        }
+
+        const savedTheme = localStorage.getItem('nazeerdfs-theme') ||
+            (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        applyTheme(savedTheme);
+
+        themeToggle.addEventListener('click', () => {
+            const next = root.classList.contains('dark') ? 'light' : 'dark';
+            localStorage.setItem('nazeerdfs-theme', next);
+            applyTheme(next);
+        });
+
+        /* ---------------- MOBILE SIDEBAR ---------------- */
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        document.getElementById('menuBtn').addEventListener('click', () => {
+            sidebar.classList.add('open');
+            overlay.classList.remove('hidden');
+        });
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay.classList.add('hidden');
+        });
+
+        /* ---------------- PROFILE DROPDOWN ---------------- */
+        const profileBtn = document.getElementById('profileBtn');
+        const profileDropdown = document.getElementById('profileDropdown');
+        profileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            profileDropdown.classList.toggle('hidden');
+        });
+        document.addEventListener('click', () => profileDropdown.classList.add('hidden'));
+
+        /* ---------------- RIPPLE EFFECT ---------------- */
+        document.querySelectorAll('.ripple').forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                const rect = this.getBoundingClientRect();
+                const circle = document.createElement('span');
+                const size = Math.max(rect.width, rect.height);
+                circle.className = 'ripple-effect';
+                circle.style.width = circle.style.height = size + 'px';
+                circle.style.left = (e.clientX - rect.left - size / 2) + 'px';
+                circle.style.top = (e.clientY - rect.top - size / 2) + 'px';
+                this.appendChild(circle);
+                setTimeout(() => circle.remove(), 600);
+            });
+        });
+
+        setTimeout(() => {
+            document.getElementById('sidebarStorageBar').style.width = '61%';
+        }, 300);
+
+        /* ---------------- TOAST NOTIFICATION ---------------- */
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'pointer-events-auto bg-card border border-app rounded-xl p-3.5 shadow-xl flex items-center gap-3 text-xs fade-in min-w-[260px] max-w-sm';
+            
+            const iconMap = {
+                info: '<i data-lucide="info" class="w-4 h-4 text-brand-500"></i>',
+                success: '<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i>',
+                warning: '<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>'
+            };
+
+            toast.innerHTML = `
+                <div class="flex-shrink-0">${iconMap[type] || iconMap.info}</div>
+                <div class="flex-1 font-medium text-app">${message}</div>
+            `;
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                toast.style.transition = 'all 300ms ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        /* ---------------- VERTICAL TAB SWITCHER ---------------- */
+        const tabBtns = document.querySelectorAll('.settings-tab-btn');
+        const panels = document.querySelectorAll('.settings-panel');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetTab = btn.getAttribute('data-tab');
+
+                tabBtns.forEach(b => {
+                    b.classList.remove('active');
+                    b.classList.add('text-app2');
+                });
+                btn.classList.add('active');
+                btn.classList.remove('text-app2');
+
+                panels.forEach(p => p.classList.add('hidden'));
+                const activePanel = document.getElementById(`panel-${targetTab}`);
+                if (activePanel) {
+                    activePanel.classList.remove('hidden');
+                }
+            });
+        });
+
+        /* ---------------- BUTTON ACTIONS ---------------- */
+        document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+            showToast('All cluster settings and preferences saved successfully!', 'success');
+        });
+
+        document.getElementById('exportConfigBtn').addEventListener('click', () => {
+            showToast('Cluster configuration JSON exported to download queue.', 'info');
+        });
+
+        // API Key Actions
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const toggleKeyVisibilityBtn = document.getElementById('toggleKeyVisibilityBtn');
+
+        toggleKeyVisibilityBtn.addEventListener('click', () => {
+            if (apiKeyInput.type === 'password') {
+                apiKeyInput.type = 'text';
+                toggleKeyVisibilityBtn.textContent = 'Hide';
+            } else {
+                apiKeyInput.type = 'password';
+                toggleKeyVisibilityBtn.textContent = 'Show';
+            }
+        });
+
+        document.getElementById('copyApiKeyBtn').addEventListener('click', () => {
+            navigator.clipboard?.writeText(apiKeyInput.value);
+            showToast('API Key copied to clipboard!', 'success');
+        });
+
+        // Danger Zone Actions
+        document.getElementById('resetSettingsBtn').addEventListener('click', () => {
+            showToast('Settings reset to system factory defaults.', 'warning');
+        });
+
+        document.getElementById('resetClusterDemoBtn').addEventListener('click', () => {
+            showToast('Demo: Soft cluster reset initiated across 3 nodes.', 'warning');
+        });
+
+        document.getElementById('deleteAccountDemoBtn').addEventListener('click', () => {
+            showToast('Demo: Account deletion request logged.', 'warning');
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NazeerDFS — Enterprise Cluster Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="js/app.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            DEFAULT: '#F97316',
+                            50: '#FFF7ED', 100: '#FFEDD5', 200: '#FED7AA', 300: '#FDBA74',
+                            400: '#FB923C', 500: '#F97316', 600: '#EA580C', 700: '#C2410C',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg: #F8FAFC;
+            --sidebar: #FFFFFF;
+            --card: #FFFFFF;
+            --surface2: #F1F5F9;
+            --border: #CBD5E1;
+            --text: #0F172A;
+            --text2: #475569;
+            --shadow-color: 15, 23, 42;
+        }
+
+        html.dark {
+            --bg: #0F172A;
+            --sidebar: #111827;
+            --card: #1E293B;
+            --surface2: #334155;
+            --border: #475569;
+            --text: #F8FAFC;
+            --text2: #CBD5E1;
+            --shadow-color: 0, 0, 0;
+        }
+
+        * {
+            transition: background-color 380ms ease, border-color 380ms ease, color 380ms ease, box-shadow 380ms ease;
+        }
+
+        html,
+        body {
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .bg-app {
+            background: var(--bg);
+        }
+
+        .bg-sidebar {
+            background: var(--sidebar);
+        }
+
+        .bg-card {
+            background: var(--card);
+        }
+
+        .bg-surface2 {
+            background: var(--surface2);
+        }
+
+        .border-app {
+            border-color: var(--border);
+        }
+
+        .text-app {
+            color: var(--text);
+        }
+
+        .text-app2 {
+            color: var(--text2);
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow: 0 1px 2px rgba(var(--shadow-color), 0.04), 0 8px 24px -12px rgba(var(--shadow-color), 0.12);
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 12px rgba(var(--shadow-color), 0.06), 0 16px 40px -14px rgba(var(--shadow-color), 0.18);
+            transform: translateY(-2px);
+        }
+
+        .card {
+            transition: transform 240ms cubic-bezier(.2, .8, .2, 1), box-shadow 240ms ease, background-color 380ms ease, border-color 380ms ease;
+        }
+
+        .glass {
+            backdrop-filter: blur(20px) saturate(160%);
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            background: color-mix(in srgb, var(--card) 72%, transparent);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 8px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #F97316;
+        }
+
+        .nav-item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            color: var(--text2);
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 200ms ease;
+        }
+
+        .nav-item:hover {
+            background: var(--surface2);
+            color: var(--text);
+            transform: translateX(2px);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.14), rgba(249, 115, 22, 0.06));
+            color: #F97316;
+        }
+
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: -14px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 22px;
+            background: #F97316;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .nav-item i {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeInUp 560ms cubic-bezier(.2, .8, .2, 1) both;
+        }
+
+        @keyframes pulseDot {
+            0% {
+                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.55);
+            }
+
+            70% {
+                box-shadow: 0 0 0 8px rgba(249, 115, 22, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+            }
+        }
+
+        .pulse-dot {
+            animation: pulseDot 2s infinite;
+        }
+
+        @keyframes shimmerBar {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        .bar-shimmer::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+            animation: shimmerBar 1.6s infinite;
+        }
+
+        .ripple {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ripple-effect {
+            position: absolute;
+            border-radius: 50%;
+            transform: scale(0);
+            background: rgba(255, 255, 255, 0.5);
+            animation: rippleAnim 600ms ease-out;
+            pointer-events: none;
+        }
+
+        @keyframes rippleAnim {
+            to {
+                transform: scale(3);
+                opacity: 0;
+            }
+        }
+
+        .progress-fill {
+            transition: width 900ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        #sidebar {
+            transition: transform 320ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .terminal-line {
+            animation: fadeInUp 380ms ease both;
+        }
+
+        .toggle-track {
+            transition: background-color 380ms ease;
+        }
+
+        .toggle-thumb {
+            transition: transform 380ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        @media (max-width: 1024px) {
+            #sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+                z-index: 40;
+                height: 100vh;
+            }
+
+            #sidebar.open {
+                transform: translateX(0);
+            }
+        }
+
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .skeleton-line {
+            background: var(--surface2);
+            border-radius: 6px;
+        }
+
+        input:focus,
+        button:focus-visible,
+        a:focus-visible {
+            outline: 2px solid #F97316;
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+
+<body class="bg-app text-app font-sans antialiased min-h-screen">
+
+    <div id="overlay" class="fixed inset-0 bg-black/40 z-30 hidden lg:hidden"></div>
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="w-[280px] bg-sidebar border-r border-app fixed top-0 left-0 h-screen flex flex-col z-40">
+        <div class="h-[72px] flex items-center gap-3 px-6 border-b border-app flex-shrink-0">
+            <div
+                class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
+                <i data-lucide="hexagon" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="leading-tight">
+                <p class="font-bold text-[15px] tracking-tight">NazeerDFS</p>
+                <p class="text-[11px] text-app2">Enterprise Distributed Storage</p>
+            </div>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto px-4 py-5 space-y-1 scrollbar-thin">
+            <p class="px-3 text-[11px] font-semibold uppercase tracking-wider text-app2 mb-2">Workspace</p>
+            <a href="dashboard.html" class="nav-item active" data-page="dashboard"><i
+                    data-lucide="layout-dashboard"></i>Dashboard</a>
+            <a href="files.html" class="nav-item" data-page="files"><i data-lucide="folder"></i>My Files</a>
+            <a href="upload.html" class="nav-item" data-page="upload"><i data-lucide="upload-cloud"></i>Upload
+                Center</a>
+            <a href="nodes.html" class="nav-item" data-page="nodes"><i data-lucide="server"></i>Storage Nodes</a>
+            <a href="cluster.html" class="nav-item" data-page="cluster"><i data-lucide="globe"></i>Cluster Monitor</a>
+            <a href="settings.html" class="nav-item" data-page="settings"><i data-lucide="settings"></i>Settings</a>
+        </nav>
+
+        <div class="px-4 pb-4">
+            <div class="card !rounded-2xl p-4 mb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-app2">Storage Used</span>
+                    <span class="text-xs font-semibold text-brand-500">61%</span>
+                </div>
+                <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
+                    <div id="sidebarStorageBar"
+                        class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill"
+                        style="width:0%"></div>
+                </div>
+                <p class="text-[11px] text-app2 mt-2">7.3 TB of 12 TB used</p>
+            </div>
+            <p class="text-[11px] text-app2 text-center mb-3">Version 1.0.4</p>
+        </div>
+
+        <div class="border-t border-app p-4 flex items-center gap-3">
+            <img src="https://api.dicebear.com/7.x/notionists/svg?seed=NazeerDFS"
+                class="w-9 h-9 rounded-full bg-surface2 flex-shrink-0" alt="User avatar">
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold truncate">Nazeer Admin</p>
+                <p class="text-[11px] text-app2 truncate">Cluster Admin</p>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-app2 flex-shrink-0"></i>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <div class="lg:ml-[280px]">
+
+        <!-- NAVBAR -->
+        <header
+            class="h-[72px] bg-sidebar/90 glass border-b border-app fixed top-0 right-0 left-0 lg:left-[280px] z-20 flex items-center px-4 md:px-6 gap-4">
+            <button id="menuBtn" class="lg:hidden p-2 rounded-lg hover:bg-surface2">
+                <i data-lucide="menu" class="w-5 h-5"></i>
+            </button>
+
+            <div class="flex-shrink-0 hidden md:block">
+                <h1 class="text-[15px] font-semibold">Dashboard</h1>
+            </div>
+
+            <div class="flex-1 max-w-xl mx-auto hidden sm:block">
+                <div class="relative">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-app2"></i>
+                    <input type="text" placeholder="Search files, nodes, logs…"
+                        class="w-full bg-surface2 border border-app rounded-xl pl-10 pr-4 py-2.5 text-sm placeholder:text-app2 focus:bg-card outline-none">
+                    <kbd
+                        class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] px-1.5 py-0.5 rounded border border-app text-app2 hidden md:block">⌘K</kbd>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 ml-auto">
+                <a href="upload.html"
+                    class="ripple hidden sm:flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg shadow-brand-500/25 transition-colors">
+                    <i data-lucide="upload" class="w-4 h-4"></i>
+                    <span>Upload</span>
+                </a>
+
+                <button id="themeToggle"
+                    class="relative w-[52px] h-[28px] rounded-full toggle-track bg-surface2 border border-app flex items-center px-1"
+                    aria-label="Toggle theme">
+                    <span id="toggleThumb"
+                        class="toggle-thumb w-[20px] h-[20px] rounded-full bg-white shadow flex items-center justify-center">
+                        <i data-lucide="moon" id="toggleIcon" class="w-3 h-3 text-slate-700"></i>
+                    </span>
+                </button>
+
+                <button class="relative p-2.5 rounded-xl hover:bg-surface2" aria-label="Notifications">
+                    <i data-lucide="bell" class="w-[18px] h-[18px]"></i>
+                    <span class="pulse-dot absolute top-2 right-2 w-2 h-2 bg-brand-500 rounded-full"></span>
+                </button>
+
+                <div class="relative">
+                    <button id="profileBtn" class="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-surface2">
+                        <img src="https://api.dicebear.com/7.x/notionists/svg?seed=Arjun"
+                            class="w-8 h-8 rounded-full bg-surface2" alt="Profile">
+                        <i data-lucide="chevron-down" class="w-4 h-4 text-app2 hidden md:block"></i>
+                    </button>
+                    <div id="profileDropdown" class="hidden absolute right-0 mt-2 w-52 card p-1.5 text-sm">
+                        <a href="settings.html"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i data-lucide="user"
+                                class="w-4 h-4"></i>Profile</a>
+                        <a href="settings.html"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                                data-lucide="settings" class="w-4 h-4"></i>Settings</a>
+                        <a href="settings.html"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i data-lucide="key"
+                                class="w-4 h-4"></i>API Keys</a>
+                        <div class="h-px bg-app my-1"></div>
+                        <a href="#" id="logoutBtn"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2 text-red-500"><i
+                                data-lucide="log-out" class="w-4 h-4"></i>Sign out</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="pt-[72px] px-4 md:px-8 pb-16 max-w-[1400px] mx-auto">
+
+            <!-- HERO -->
+            <section class="fade-in mt-8 mb-8">
+                <div class="card !rounded-3xl p-6 md:p-8 relative overflow-hidden">
+                    <div class="absolute -top-24 -right-24 w-72 h-72 bg-brand-500/10 rounded-full blur-3xl"></div>
+                    <div class="relative flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+                        <div>
+                            <span
+                                class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-600 dark:text-brand-400 bg-brand-500/10 px-2.5 py-1 rounded-full mb-3">
+                                <span class="w-1.5 h-1.5 rounded-full bg-brand-500 pulse-dot"></span> LIVE CLUSTER
+                            </span>
+                            <h2 class="text-2xl md:text-[28px] font-bold tracking-tight">Enterprise Cluster Dashboard
+                            </h2>
+                            <p class="text-app2 text-sm mt-2 max-w-lg">Monitor distributed storage nodes, replication
+                                health and cluster activity in real time.</p>
+                        </div>
+                        <div class="grid grid-cols-3 gap-3 w-full lg:w-auto">
+                            <div class="bg-surface2 rounded-2xl px-4 py-3 text-center">
+                                <div class="flex items-center justify-center gap-1.5 mb-1">
+                                    <span class="status-dot bg-emerald-500"></span>
+                                    <p class="text-xs font-semibold">Healthy</p>
+                                </div>
+                                <p class="text-[11px] text-app2">Cluster Status</p>
+                            </div>
+                            <div class="bg-surface2 rounded-2xl px-4 py-3 text-center">
+                                <p class="text-lg font-bold text-brand-500"><span id="activeNodesHero">0</span></p>
+                                <p class="text-[11px] text-app2">Active Nodes</p>
+                            </div>
+                            <div class="bg-surface2 rounded-2xl px-4 py-3 text-center">
+                                <p class="text-lg font-bold"><span id="availabilityHero">0</span>%</p>
+                                <p class="text-[11px] text-app2">Availability</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- STAT CARDS -->
+            <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+                <div class="card p-5 fade-in" style="animation-delay:60ms">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center"><i
+                                data-lucide="database" class="w-5 h-5 text-brand-500"></i></div>
+                        <span
+                            class="text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">stable</span>
+                    </div>
+                    <p class="text-2xl font-bold tracking-tight"><span id="statTotal">0</span> TB</p>
+                    <p class="text-xs text-app2 mt-1">Total Storage</p>
+                </div>
+                <div class="card p-5 fade-in" style="animation-delay:120ms">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center"><i
+                                data-lucide="hard-drive" class="w-5 h-5 text-brand-500"></i></div>
+                        <span
+                            class="text-[11px] font-medium text-brand-600 dark:text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded-full">+2.1%</span>
+                    </div>
+                    <p class="text-2xl font-bold tracking-tight"><span id="statUsed">0</span> TB</p>
+                    <p class="text-xs text-app2 mt-1">Used Storage</p>
+                </div>
+                <div class="card p-5 fade-in" style="animation-delay:180ms">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center"><i
+                                data-lucide="server-cog" class="w-5 h-5 text-brand-500"></i></div>
+                        <span
+                            class="text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">online</span>
+                    </div>
+                    <p class="text-2xl font-bold tracking-tight"><span id="statNodes">0</span></p>
+                    <p class="text-xs text-app2 mt-1">Active Nodes</p>
+                </div>
+                <div class="card p-5 fade-in" style="animation-delay:240ms">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center"><i
+                                data-lucide="shield-check" class="w-5 h-5 text-brand-500"></i></div>
+                        <span
+                            class="text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">optimal</span>
+                    </div>
+                    <p class="text-2xl font-bold tracking-tight"><span id="statReplication">0</span>%</p>
+                    <p class="text-xs text-app2 mt-1">Replication Health</p>
+                </div>
+            </section>
+
+            <!-- CHART + TABLE -->
+            <section class="grid grid-cols-1 xl:grid-cols-5 gap-4 mb-6">
+                <div class="card p-6 xl:col-span-3 fade-in">
+                    <div class="flex items-center justify-between mb-1">
+                        <div>
+                            <h3 class="font-semibold text-sm">Storage Usage</h3>
+                            <p class="text-[11px] text-app2">Last 14 days across all nodes</p>
+                        </div>
+                        <div class="flex gap-1 bg-surface2 rounded-lg p-1">
+                            <button class="text-xs font-medium px-2.5 py-1 rounded-md bg-card shadow-sm">14D</button>
+                            <button class="text-xs font-medium px-2.5 py-1 rounded-md text-app2">30D</button>
+                            <button class="text-xs font-medium px-2.5 py-1 rounded-md text-app2">90D</button>
+                        </div>
+                    </div>
+                    <svg id="areaChart" viewBox="0 0 560 220" class="w-full h-56 mt-4" preserveAspectRatio="none">
+                        <defs>
+                            <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#F97316" stop-opacity="0.35" />
+                                <stop offset="100%" stop-color="#F97316" stop-opacity="0" />
+                            </linearGradient>
+                        </defs>
+                        <g id="gridLines"></g>
+                        <path id="areaPath" fill="url(#areaFill)" stroke="none"></path>
+                        <path id="linePath" fill="none" stroke="#F97316" stroke-width="2.5" stroke-linecap="round"
+                            stroke-linejoin="round"></path>
+                        <g id="chartDots"></g>
+                    </svg>
+                    <div class="flex justify-between text-[10px] text-app2 mt-1 px-1">
+                        <span>Jul 15</span><span>Jul 18</span><span>Jul 21</span><span>Jul 24</span><span>Jul 28</span>
+                    </div>
+                </div>
+
+                <div class="card p-6 xl:col-span-2 fade-in">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-sm">Recent Uploads</h3>
+                        <a href="#" class="text-xs font-medium text-brand-500 hover:text-brand-600">View all</a>
+                    </div>
+                    <div class="space-y-1" id="uploadsTable">
+                        <!-- populated by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- TIMELINE + LOGS -->
+            <section class="grid grid-cols-1 xl:grid-cols-5 gap-4 mb-6">
+                <div class="card p-6 xl:col-span-2 fade-in">
+                    <h3 class="font-semibold text-sm mb-4">Live Cluster Activity</h3>
+                    <div id="timeline" class="space-y-5 relative pl-1 max-h-72 overflow-y-auto scrollbar-thin"></div>
+                </div>
+
+                <div class="card !bg-slate-950 !border-slate-800 p-0 xl:col-span-3 fade-in overflow-hidden">
+                    <div class="flex items-center gap-2 px-5 py-3 border-b border-slate-800">
+                        <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
+                        <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
+                        <span class="w-3 h-3 rounded-full bg-emerald-500/80"></span>
+                        <span class="text-slate-400 text-xs font-mono ml-2">nazeerdfs — system.log</span>
+                    </div>
+                    <div id="terminal"
+                        class="p-5 font-mono text-[12.5px] leading-relaxed h-72 overflow-y-auto scrollbar-thin text-slate-300">
+                    </div>
+                </div>
+            </section>
+
+            <!-- UPLOAD PROGRESS -->
+            <section class="card p-6 mb-6 fade-in">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-sm">Active Transfers</h3>
+                    <span class="text-xs text-app2"><span id="transferCount">3</span> in progress</span>
+                </div>
+                <div id="transfers" class="space-y-4"></div>
+            </section>
+
+            <!-- QUICK ACTIONS -->
+            <section class="fade-in mb-4">
+                <h3 class="font-semibold text-sm mb-4">Quick Actions</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <button class="ripple card p-5 flex flex-col items-center gap-3 hover:border-brand-500/50 group">
+                        <div
+                            class="w-11 h-11 rounded-xl bg-brand-500/10 flex items-center justify-center group-hover:bg-brand-500 transition-colors">
+                            <i data-lucide="upload-cloud"
+                                class="w-5 h-5 text-brand-500 group-hover:text-white transition-colors"></i>
+                        </div>
+                        <span class="text-sm font-medium">Upload File</span>
+                    </button>
+                    <button class="ripple card p-5 flex flex-col items-center gap-3 hover:border-brand-500/50 group">
+                        <div
+                            class="w-11 h-11 rounded-xl bg-brand-500/10 flex items-center justify-center group-hover:bg-brand-500 transition-colors">
+                            <i data-lucide="folder-plus"
+                                class="w-5 h-5 text-brand-500 group-hover:text-white transition-colors"></i>
+                        </div>
+                        <span class="text-sm font-medium">Create Folder</span>
+                    </button>
+                    <button id="refreshClusterBtn"
+                        class="ripple card p-5 flex flex-col items-center gap-3 hover:border-brand-500/50 group">
+                        <div
+                            class="w-11 h-11 rounded-xl bg-brand-500/10 flex items-center justify-center group-hover:bg-brand-500 transition-colors">
+                            <i data-lucide="refresh-cw" id="refreshIcon"
+                                class="w-5 h-5 text-brand-500 group-hover:text-white transition-colors"></i>
+                        </div>
+                        <span class="text-sm font-medium">Refresh Cluster</span>
+                    </button>
+                    <button class="ripple card p-5 flex flex-col items-center gap-3 hover:border-brand-500/50 group">
+                        <div
+                            class="w-11 h-11 rounded-xl bg-brand-500/10 flex items-center justify-center group-hover:bg-brand-500 transition-colors">
+                            <i data-lucide="server"
+                                class="w-5 h-5 text-brand-500 group-hover:text-white transition-colors"></i>
+                        </div>
+                        <span class="text-sm font-medium">View Nodes</span>
+                    </button>
+                </div>
+            </section>
+
+            <footer class="text-center text-[11px] text-app2 pt-6 pb-2">
+                NazeerDFS Enterprise · Distributed Storage Platform · Built for real-time cluster observability
+            </footer>
+
+        </main>
+    </div>
+
+    <script>
+        // Session Verification
+        if (typeof checkSession === 'function') {
+            checkSession();
+        }
+
+        lucide.createIcons();
+
+        /* ---------------- THEME ---------------- */
+        const root = document.documentElement;
+        const themeToggle = document.getElementById('themeToggle');
+        const toggleThumb = document.getElementById('toggleThumb');
+        const toggleIconEl = document.getElementById('toggleIcon');
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                root.classList.add('dark');
+                toggleThumb.style.transform = 'translateX(24px)';
+                toggleIconEl.setAttribute('data-lucide', 'moon');
+            } else {
+                root.classList.remove('dark');
+                toggleThumb.style.transform = 'translateX(0px)';
+                toggleIconEl.setAttribute('data-lucide', 'sun');
+            }
+            lucide.createIcons();
+        }
+
+        const savedTheme = localStorage.getItem('nazeerdfs-theme') ||
+            (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        applyTheme(savedTheme);
+
+        themeToggle.addEventListener('click', () => {
+            const next = root.classList.contains('dark') ? 'light' : 'dark';
+            localStorage.setItem('nazeerdfs-theme', next);
+            applyTheme(next);
+        });
+
+        /* ---------------- SIDEBAR (mobile) ---------------- */
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        document.getElementById('menuBtn').addEventListener('click', () => {
+            sidebar.classList.add('open');
+            overlay.classList.remove('hidden');
+        });
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay.classList.add('hidden');
+        });
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                sidebar.classList.remove('open');
+                overlay.classList.add('hidden');
+            });
+        });
+
+        /* ---------------- PROFILE DROPDOWN ---------------- */
+        const profileBtn = document.getElementById('profileBtn');
+        const profileDropdown = document.getElementById('profileDropdown');
+        profileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            profileDropdown.classList.toggle('hidden');
+        });
+        document.addEventListener('click', () => profileDropdown.classList.add('hidden'));
+
+        /* ---------------- RIPPLE EFFECT ---------------- */
+        document.querySelectorAll('.ripple').forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                const rect = this.getBoundingClientRect();
+                const circle = document.createElement('span');
+                const size = Math.max(rect.width, rect.height);
+                circle.className = 'ripple-effect';
+                circle.style.width = circle.style.height = size + 'px';
+                circle.style.left = (e.clientX - rect.left - size / 2) + 'px';
+                circle.style.top = (e.clientY - rect.top - size / 2) + 'px';
+                this.appendChild(circle);
+                setTimeout(() => circle.remove(), 600);
+            });
+        });
+
+        /* ---------------- NUMBER COUNTER ---------------- */
+        function animateCounter(el, target, opts = {}) {
+            if (!el) return;
+            const { decimals = 0, duration = 1400, suffix = '' } = opts;
+            const start = 0;
+            const startTime = performance.now();
+            function tick(now) {
+                const progress = Math.min((now - startTime) / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const value = start + (target - start) * eased;
+                el.textContent = value.toFixed(decimals) + suffix;
+                if (progress < 1) requestAnimationFrame(tick);
+            }
+            requestAnimationFrame(tick);
+        }
+
+        // Fetch Dashboard Stats from API
+        fetch('/api/dashboard')
+            .then(res => res.json())
+            .then(data => {
+                animateCounter(document.getElementById('statTotal'), data.totalStorage || 12, { decimals: 0 });
+                animateCounter(document.getElementById('statUsed'), data.usedStorage || 7.3, { decimals: 1 });
+                animateCounter(document.getElementById('statNodes'), data.activeNodes || 3, { decimals: 0 });
+                animateCounter(document.getElementById('statReplication'), data.replicationHealth || 99.98, { decimals: 2 });
+                animateCounter(document.getElementById('activeNodesHero'), data.activeNodes || 3, { decimals: 0 });
+                animateCounter(document.getElementById('availabilityHero'), data.availability || 100, { decimals: 2 });
+            })
+            .catch(err => {
+                console.error('Error fetching dashboard data:', err);
+                animateCounter(document.getElementById('statTotal'), 12, { decimals: 0 });
+                animateCounter(document.getElementById('statUsed'), 7.3, { decimals: 1 });
+                animateCounter(document.getElementById('statNodes'), 3, { decimals: 0 });
+                animateCounter(document.getElementById('statReplication'), 99.98, { decimals: 2 });
+                animateCounter(document.getElementById('activeNodesHero'), 3, { decimals: 0 });
+                animateCounter(document.getElementById('availabilityHero'), 100, { decimals: 2 });
+            });
+
+        setTimeout(() => {
+            document.getElementById('sidebarStorageBar').style.width = '61%';
+        }, 300);
+
+        /* ---------------- AREA CHART ---------------- */
+        const chartData = [4.1, 4.4, 4.3, 4.8, 5.1, 5.0, 5.6, 6.0, 5.9, 6.4, 6.8, 6.9, 7.1, 7.3];
+        function buildChart() {
+            const w = 560, h = 220, pad = 10;
+            const max = Math.max(...chartData) * 1.15;
+            const min = 0;
+            const stepX = (w - pad * 2) / (chartData.length - 1);
+            const points = chartData.map((v, i) => {
+                const x = pad + i * stepX;
+                const y = h - pad - ((v - min) / (max - min)) * (h - pad * 2);
+                return [x, y];
+            });
+
+            const linePath = points.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(' ');
+            const areaPath = linePath + ` L${points[points.length - 1][0]},${h - pad} L${points[0][0]},${h - pad} Z`;
+
+            const lineEl = document.getElementById('linePath');
+            const areaEl = document.getElementById('areaPath');
+            lineEl.setAttribute('d', linePath);
+            areaEl.setAttribute('d', areaPath);
+
+            const len = lineEl.getTotalLength();
+            lineEl.style.strokeDasharray = len;
+            lineEl.style.strokeDashoffset = len;
+            lineEl.getBoundingClientRect();
+            lineEl.style.transition = 'stroke-dashoffset 1400ms cubic-bezier(.2,.8,.2,1)';
+            requestAnimationFrame(() => { lineEl.style.strokeDashoffset = 0; });
+            areaEl.style.opacity = 0;
+            areaEl.style.transition = 'opacity 900ms ease 400ms';
+            requestAnimationFrame(() => { areaEl.style.opacity = 1; });
+
+            const grid = document.getElementById('gridLines');
+            grid.innerHTML = '';
+            for (let i = 1; i < 4; i++) {
+                const y = pad + i * ((h - pad * 2) / 4);
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', pad); line.setAttribute('x2', w - pad);
+                line.setAttribute('y1', y); line.setAttribute('y2', y);
+                line.setAttribute('stroke', 'currentColor');
+                line.setAttribute('stroke-opacity', '0.08');
+                line.setAttribute('class', 'text-app2');
+                grid.appendChild(line);
+            }
+
+            const dots = document.getElementById('chartDots');
+            dots.innerHTML = '';
+            const last = points[points.length - 1];
+            const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            dot.setAttribute('cx', last[0]); dot.setAttribute('cy', last[1]); dot.setAttribute('r', 4.5);
+            dot.setAttribute('fill', '#F97316'); dot.setAttribute('stroke', 'white'); dot.setAttribute('stroke-width', '2');
+            dots.appendChild(dot);
+        }
+        buildChart();
+
+        /* ---------------- RECENT UPLOADS ---------------- */
+        const uploads = [
+            { name: 'quarterly-backup.tar.gz', size: '4.2 GB', node: 'node-a1', time: '2m ago', icon: 'archive' },
+            { name: 'ml-dataset-v3.parquet', size: '1.8 GB', node: 'node-b2', time: '14m ago', icon: 'file-bar-chart' },
+            { name: 'infra-snapshot.img', size: '9.6 GB', node: 'node-a1', time: '41m ago', icon: 'hard-drive-download' },
+            { name: 'audit-logs-2026-07.zip', size: '640 MB', node: 'node-c3', time: '1h ago', icon: 'file-archive' },
+            { name: 'customer-export.csv', size: '212 MB', node: 'node-b2', time: '3h ago', icon: 'file-spreadsheet' },
+        ];
+        const uploadsTable = document.getElementById('uploadsTable');
+        uploads.forEach((u, i) => {
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-3 py-2.5 px-2 rounded-xl hover:bg-surface2 fade-in';
+            row.style.animationDelay = (i * 70) + 'ms';
+            row.innerHTML = `
+    <div class="w-9 h-9 rounded-lg bg-surface2 flex items-center justify-center flex-shrink-0">
+      <i data-lucide="${u.icon}" class="w-4 h-4 text-brand-500"></i>
+    </div>
+    <div class="min-w-0 flex-1">
+      <p class="text-sm font-medium truncate">${u.name}</p>
+      <p class="text-[11px] text-app2">${u.size} · ${u.node}</p>
+    </div>
+    <span class="text-[11px] text-app2 flex-shrink-0">${u.time}</span>
+  `;
+            uploadsTable.appendChild(row);
+        });
+
+        /* ---------------- LIVE TIMELINE ---------------- */
+        const timelineEvents = [
+            { text: 'Replication completed on node-a1', icon: 'check-circle', color: 'text-emerald-500' },
+            { text: 'New shard allocated to node-b2', icon: 'boxes', color: 'text-brand-500' },
+            { text: 'Health check passed on all nodes', icon: 'shield-check', color: 'text-emerald-500' },
+            { text: 'Upload batch synced to node-c3', icon: 'upload', color: 'text-brand-500' },
+            { text: 'Latency spike auto-resolved', icon: 'activity', color: 'text-amber-500' },
+            { text: 'Snapshot created for disaster recovery', icon: 'camera', color: 'text-brand-500' },
+        ];
+        const timelineEl = document.getElementById('timeline');
+        let tIndex = 0;
+        function pushTimelineEvent() {
+            const ev = timelineEvents[tIndex % timelineEvents.length];
+            tIndex++;
+            const item = document.createElement('div');
+            item.className = 'flex gap-3 fade-in';
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            item.innerHTML = `
+    <div class="flex flex-col items-center flex-shrink-0">
+      <div class="w-7 h-7 rounded-full bg-surface2 flex items-center justify-center"><i data-lucide="${ev.icon}" class="w-3.5 h-3.5 ${ev.color}"></i></div>
+      <div class="w-px flex-1 bg-app mt-1"></div>
+    </div>
+    <div class="pb-1">
+      <p class="text-[13px] font-medium">${ev.text}</p>
+      <p class="text-[11px] text-app2">${timeStr}</p>
+    </div>
+  `;
+            timelineEl.prepend(item);
+            lucide.createIcons();
+            while (timelineEl.children.length > 6) timelineEl.removeChild(timelineEl.lastChild);
+        }
+        for (let i = 0; i < 4; i++) pushTimelineEvent();
+        setInterval(pushTimelineEvent, 4500);
+
+        /* ---------------- SYSTEM LOGS TERMINAL ---------------- */
+        const logTemplates = [
+            ['INFO', 'raft: leader election completed on node-a1'],
+            ['INFO', 'shard[0x4f2a] replicated to node-b2, node-c3'],
+            ['WARN', 'gc pause 182ms on node-b2, above threshold'],
+            ['INFO', 'heartbeat ack from node-c3 (rtt 4ms)'],
+            ['INFO', 'chunk store compaction finished, freed 2.1GB'],
+            ['ERROR', 'retrying write to node-a1, attempt 2/3'],
+            ['INFO', 'write to node-a1 succeeded after retry'],
+            ['INFO', 'metadata checkpoint written to node-b2'],
+        ];
+        const terminal = document.getElementById('terminal');
+        const logColors = { INFO: 'text-emerald-400', WARN: 'text-amber-400', ERROR: 'text-red-400' };
+        function pushLog() {
+            const [level, msg] = logTemplates[Math.floor(Math.random() * logTemplates.length)];
+            const now = new Date().toISOString().split('T')[1].split('.')[0];
+            const line = document.createElement('div');
+            line.className = 'terminal-line';
+            line.innerHTML = `<span class="text-slate-500">${now}</span> <span class="${logColors[level]} font-semibold">${level.padEnd(5)}</span> <span>${msg}</span>`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+            while (terminal.children.length > 40) terminal.removeChild(terminal.firstChild);
+        }
+        for (let i = 0; i < 10; i++) pushLog();
+        setInterval(pushLog, 1800);
+
+        /* ---------------- ACTIVE TRANSFERS ---------------- */
+        const transferData = [
+            { name: 'backup-cluster-east.tar', total: 4200, speed: 38, id: 't1' },
+            { name: 'model-checkpoint-v9.bin', total: 2100, speed: 22, id: 't2' },
+            { name: 'log-archive-jun-jul.zip', total: 980, speed: 15, id: 't3' },
+        ];
+        const transfersEl = document.getElementById('transfers');
+        transferData.forEach(t => {
+            const wrap = document.createElement('div');
+            wrap.innerHTML = `
+    <div class="flex items-center justify-between mb-1.5">
+      <div class="flex items-center gap-2">
+        <i data-lucide="file-up" class="w-3.5 h-3.5 text-brand-500"></i>
+        <span class="text-sm font-medium">${t.name}</span>
+      </div>
+      <span class="text-xs text-app2"><span id="pct-${t.id}">0</span>%</span>
+    </div>
+    <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden relative">
+      <div id="bar-${t.id}" class="progress-fill bar-shimmer relative h-full bg-gradient-to-r from-brand-400 to-brand-600 rounded-full" style="width:0%"></div>
+    </div>
+    <div class="flex justify-between text-[11px] text-app2 mt-1">
+      <span id="speed-${t.id}">${t.speed} MB/s</span>
+      <span id="eta-${t.id}">calculating…</span>
+    </div>
+  `;
+            wrap.className = 'fade-in';
+            transfersEl.appendChild(wrap);
+        });
+        lucide.createIcons();
+
+        function runTransfers() {
+            transferData.forEach(t => {
+                let progress = Math.random() * 20;
+                const bar = document.getElementById(`bar-${t.id}`);
+                const pct = document.getElementById(`pct-${t.id}`);
+                const eta = document.getElementById(`eta-${t.id}`);
+                const speed = document.getElementById(`speed-${t.id}`);
+                const timer = setInterval(() => {
+                    progress += Math.random() * 9 + 3;
+                    if (progress >= 100) {
+                        progress = 100;
+                        clearInterval(timer);
+                        eta.textContent = 'complete';
+                        bar.classList.remove('bar-shimmer');
+                    } else {
+                        const remainingMB = t.total * (1 - progress / 100);
+                        const etaSec = Math.round(remainingMB / t.speed);
+                        eta.textContent = etaSec > 60 ? `${Math.round(etaSec / 60)}m remaining` : `${etaSec}s remaining`;
+                        speed.textContent = `${(t.speed + (Math.random() * 4 - 2)).toFixed(1)} MB/s`;
+                    }
+                    bar.style.width = progress + '%';
+                    pct.textContent = Math.round(progress);
+                }, 900);
+            });
+        }
+        runTransfers();
+
+        /* ---------------- REFRESH CLUSTER ---------------- */
+        document.getElementById('refreshClusterBtn').addEventListener('click', () => {
+            const icon = document.getElementById('refreshIcon');
+            icon.style.transition = 'transform 700ms ease';
+            icon.style.transform = 'rotate(360deg)';
+            setTimeout(() => { icon.style.transform = 'rotate(0deg)'; }, 700);
+            pushTimelineEvent();
+        });
+    </script>
+
+</body>
+
+</html>

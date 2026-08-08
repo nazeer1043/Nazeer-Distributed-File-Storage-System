@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cluster Monitor — NazeerDFS Enterprise</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            DEFAULT: '#F97316',
+                            50: '#FFF7ED', 100: '#FFEDD5', 200: '#FED7AA', 300: '#FDBA74',
+                            400: '#FB923C', 500: '#F97316', 600: '#EA580C', 700: '#C2410C',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg: #F8FAFC;
+            --sidebar: #FFFFFF;
+            --card: #FFFFFF;
+            --surface2: #F1F5F9;
+            --border: #CBD5E1;
+            --text: #0F172A;
+            --text2: #475569;
+            --shadow-color: 15, 23, 42;
+        }
+
+        html.dark {
+            --bg: #0F172A;
+            --sidebar: #111827;
+            --card: #1E293B;
+            --surface2: #334155;
+            --border: #475569;
+            --text: #F8FAFC;
+            --text2: #CBD5E1;
+            --shadow-color: 0, 0, 0;
+        }
+
+        * {
+            transition: background-color 380ms ease, border-color 380ms ease, color 380ms ease, box-shadow 380ms ease;
+        }
+
+        html,
+        body {
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .bg-app {
+            background: var(--bg);
+        }
+
+        .bg-sidebar {
+            background: var(--sidebar);
+        }
+
+        .bg-card {
+            background: var(--card);
+        }
+
+        .bg-surface2 {
+            background: var(--surface2);
+        }
+
+        .border-app {
+            border-color: var(--border);
+        }
+
+        .text-app {
+            color: var(--text);
+        }
+
+        .text-app2 {
+            color: var(--text2);
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow: 0 1px 2px rgba(var(--shadow-color), 0.04), 0 8px 24px -12px rgba(var(--shadow-color), 0.12);
+            transition: transform 240ms cubic-bezier(.2, .8, .2, 1), box-shadow 240ms ease, background-color 380ms ease, border-color 380ms ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 12px rgba(var(--shadow-color), 0.06), 0 16px 40px -14px rgba(var(--shadow-color), 0.18);
+            transform: translateY(-2px);
+        }
+
+        .glass {
+            backdrop-filter: blur(20px) saturate(160%);
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            background: color-mix(in srgb, var(--card) 72%, transparent);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 8px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #F97316;
+        }
+
+        .nav-item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            color: var(--text2);
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 200ms ease;
+        }
+
+        .nav-item:hover {
+            background: var(--surface2);
+            color: var(--text);
+            transform: translateX(2px);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.14), rgba(249, 115, 22, 0.06));
+            color: #F97316;
+        }
+
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: -14px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 22px;
+            background: #F97316;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .nav-item i {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeInUp 560ms cubic-bezier(.2, .8, .2, 1) both;
+        }
+
+        @keyframes pulseDot {
+            0% {
+                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.55);
+            }
+
+            70% {
+                box-shadow: 0 0 0 8px rgba(249, 115, 22, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+            }
+        }
+
+        .pulse-dot {
+            animation: pulseDot 2s infinite;
+        }
+
+        @keyframes pulseGreen {
+            0% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55);
+            }
+
+            70% {
+                box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+
+        .pulse-green {
+            animation: pulseGreen 2s infinite;
+        }
+
+        .ripple {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ripple-effect {
+            position: absolute;
+            border-radius: 50%;
+            transform: scale(0);
+            background: rgba(255, 255, 255, 0.5);
+            animation: rippleAnim 600ms ease-out;
+            pointer-events: none;
+        }
+
+        @keyframes rippleAnim {
+            to {
+                transform: scale(3);
+                opacity: 0;
+            }
+        }
+
+        .progress-fill {
+            transition: width 900ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        #sidebar {
+            transition: transform 320ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .toggle-track {
+            transition: background-color 380ms ease;
+        }
+
+        .toggle-thumb {
+            transition: transform 380ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        @media (max-width: 1024px) {
+            #sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+                z-index: 40;
+                height: 100vh;
+            }
+
+            #sidebar.open {
+                transform: translateX(0);
+            }
+        }
+
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        input:focus,
+        button:focus-visible,
+        select:focus,
+        a:focus-visible {
+            outline: 2px solid #F97316;
+            outline-offset: 2px;
+        }
+
+        /* SVG Network Triangle Animation */
+        @keyframes pkt12 {
+            0% {
+                cx: 400;
+                cy: 45;
+                opacity: 0.2;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                cx: 180;
+                cy: 220;
+                opacity: 0.2;
+            }
+        }
+
+        @keyframes pkt23 {
+            0% {
+                cx: 180;
+                cy: 220;
+                opacity: 0.2;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                cx: 620;
+                cy: 220;
+                opacity: 0.2;
+            }
+        }
+
+        @keyframes pkt31 {
+            0% {
+                cx: 620;
+                cy: 220;
+                opacity: 0.2;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                cx: 400;
+                cy: 45;
+                opacity: 0.2;
+            }
+        }
+
+        .packet-12 {
+            animation: pkt12 2.6s infinite ease-in-out;
+        }
+
+        .packet-23 {
+            animation: pkt23 2.6s infinite ease-in-out 0.8s;
+        }
+
+        .packet-31 {
+            animation: pkt31 2.6s infinite ease-in-out 1.6s;
+        }
+
+        .terminal-line {
+            animation: fadeInUp 380ms ease both;
+        }
+    </style>
+</head>
+
+<body class="bg-app text-app font-sans antialiased min-h-screen">
+
+    <div id="overlay" class="fixed inset-0 bg-black/40 z-30 hidden lg:hidden"></div>
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="w-[280px] bg-sidebar border-r border-app fixed top-0 left-0 h-screen flex flex-col z-40">
+        <div class="h-[72px] flex items-center gap-3 px-6 border-b border-app flex-shrink-0">
+            <div
+                class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
+                <i data-lucide="hexagon" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="leading-tight">
+                <p class="font-bold text-[15px] tracking-tight">NazeerDFS</p>
+                <p class="text-[11px] text-app2">Enterprise Distributed Storage</p>
+            </div>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto px-4 py-5 space-y-1 scrollbar-thin">
+            <p class="px-3 text-[11px] font-semibold uppercase tracking-wider text-app2 mb-2">Workspace</p>
+            <a href="dashboard.html" class="nav-item" data-page="dashboard"><i
+                    data-lucide="layout-dashboard"></i>Dashboard</a>
+            <a href="files.html" class="nav-item" data-page="files"><i data-lucide="folder"></i>My Files</a>
+            <a href="upload.html" class="nav-item" data-page="upload"><i data-lucide="upload-cloud"></i>Upload Center</a>
+            <a href="nodes.html" class="nav-item" data-page="nodes"><i data-lucide="server"></i>Storage Nodes</a>
+            <a href="cluster.html" class="nav-item active" data-page="cluster"><i data-lucide="globe"></i>Cluster Monitor</a>
+            <a href="settings.html" class="nav-item" data-page="settings"><i data-lucide="settings"></i>Settings</a>
+        </nav>
+
+        <div class="px-4 pb-4">
+            <div class="card !rounded-2xl p-4 mb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-app2">Storage Used</span>
+                    <span class="text-xs font-semibold text-brand-500">61%</span>
+                </div>
+                <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
+                    <div id="sidebarStorageBar"
+                        class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill"
+                        style="width:0%"></div>
+                </div>
+                <p class="text-[11px] text-app2 mt-2">7.3 TB of 12 TB used</p>
+            </div>
+            <p class="text-[11px] text-app2 text-center mb-3">Version 1.0.4</p>
+        </div>
+
+        <div class="border-t border-app p-4 flex items-center gap-3">
+            <img src="https://api.dicebear.com/7.x/notionists/svg?seed=Arjun"
+                class="w-9 h-9 rounded-full bg-surface2 flex-shrink-0" alt="User avatar">
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold truncate">Arjun Nazeer</p>
+                <p class="text-[11px] text-app2 truncate">Cluster Admin</p>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-app2 flex-shrink-0"></i>
+        </div>
+    </aside>
+
+    <!-- MAIN WRAPPER -->
+    <div class="lg:ml-[280px]">
+
+        <!-- NAVBAR -->
+        <header
+            class="h-[72px] bg-sidebar/90 glass border-b border-app fixed top-0 right-0 left-0 lg:left-[280px] z-20 flex items-center px-4 md:px-6 gap-4">
+            <button id="menuBtn" class="lg:hidden p-2 rounded-lg hover:bg-surface2">
+                <i data-lucide="menu" class="w-5 h-5"></i>
+            </button>
+
+            <div class="flex-shrink-0 hidden md:block">
+                <h1 class="text-[15px] font-semibold">Cluster Monitor</h1>
+            </div>
+
+            <div class="flex-1 max-w-xl mx-auto hidden sm:block">
+                <div class="relative">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-app2"></i>
+                    <input type="text" id="globalNavSearch" placeholder="Search cluster metrics, nodes, or gRPC telemetry…"
+                        class="w-full bg-surface2 border border-app rounded-xl pl-10 pr-4 py-2 text-sm placeholder:text-app2 focus:bg-card outline-none">
+                    <kbd
+                        class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] px-1.5 py-0.5 rounded border border-app text-app2 hidden md:block">⌘K</kbd>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 ml-auto">
+                <button id="themeToggle"
+                    class="relative w-[52px] h-[28px] rounded-full toggle-track bg-surface2 border border-app flex items-center px-1"
+                    aria-label="Toggle theme">
+                    <span id="toggleThumb"
+                        class="toggle-thumb w-[20px] h-[20px] rounded-full bg-white shadow flex items-center justify-center">
+                        <i data-lucide="moon" id="toggleIcon" class="w-3 h-3 text-slate-700"></i>
+                    </span>
+                </button>
+
+                <button class="relative p-2.5 rounded-xl hover:bg-surface2" aria-label="Notifications">
+                    <i data-lucide="bell" class="w-[18px] h-[18px]"></i>
+                    <span class="pulse-dot absolute top-2 right-2 w-2 h-2 bg-brand-500 rounded-full"></span>
+                </button>
+
+                <div class="relative">
+                    <button id="profileBtn" class="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-surface2">
+                        <img src="https://api.dicebear.com/7.x/notionists/svg?seed=Arjun"
+                            class="w-8 h-8 rounded-full bg-surface2" alt="Profile">
+                        <i data-lucide="chevron-down" class="w-4 h-4 text-app2 hidden md:block"></i>
+                    </button>
+                    <div id="profileDropdown" class="hidden absolute right-0 mt-2 w-52 card p-1.5 text-sm z-50">
+                        <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                                data-lucide="user" class="w-4 h-4"></i>Profile</a>
+                        <a href="settings.html" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                                data-lucide="settings" class="w-4 h-4"></i>Settings</a>
+                        <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                                data-lucide="key" class="w-4 h-4"></i>API Keys</a>
+                        <div class="h-px bg-app my-1"></div>
+                        <a href="#"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2 text-red-500"><i
+                                data-lucide="log-out" class="w-4 h-4"></i>Sign out</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="pt-[72px] px-4 md:px-8 pb-16 max-w-[1600px] mx-auto">
+
+            <!-- PAGE HEADER -->
+            <section class="fade-in mt-6 mb-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-semibold text-brand-500 uppercase tracking-wider">Network Operations Center</span>
+                            <span class="text-app2">•</span>
+                            <span class="text-xs text-app2">Real-time Cluster Telemetry</span>
+                        </div>
+                        <h2 class="text-2xl md:text-3xl font-bold tracking-tight">Cluster Monitor (NOC)</h2>
+                        <p class="text-app2 text-sm mt-1">Real-time network topology, chunk replication pipeline, and inter-node health monitoring console.</p>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button id="triggerRebalanceBtn"
+                            class="ripple flex items-center gap-2 bg-surface2 hover:bg-surface2/80 text-app border border-app font-medium text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm">
+                            <i data-lucide="sliders" class="w-4 h-4 text-brand-500"></i>
+                            <span>Rebalance Cluster</span>
+                        </button>
+
+                        <button id="refreshNocBtn"
+                            class="ripple flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-medium text-sm px-5 py-2.5 rounded-xl shadow-lg shadow-brand-500/25 transition-all">
+                            <i data-lucide="refresh-cw" id="nocRefreshIcon" class="w-4 h-4"></i>
+                            <span>Live Pulse</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5 NOC OVERVIEW METRIC CARDS -->
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                <div class="card p-5 fade-in" style="animation-delay:60ms">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-app2 font-medium">Cluster Health</span>
+                        <span class="status-dot bg-emerald-500 pulse-green"></span>
+                    </div>
+                    <p class="text-xl font-bold text-emerald-500">99.8%</p>
+                    <p class="text-[11px] text-app2 mt-1">3 Nodes Online</p>
+                </div>
+
+                <div class="card p-5 fade-in" style="animation-delay:120ms">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-app2 font-medium">Network Throughput</span>
+                        <i data-lucide="activity" class="w-4 h-4 text-brand-500"></i>
+                    </div>
+                    <p class="text-xl font-bold text-brand-500"><span id="nocBandwidthVal">148.5</span> MB/s</p>
+                    <p class="text-[11px] text-app2 mt-1">Inbound / Outbound</p>
+                </div>
+
+                <div class="card p-5 fade-in" style="animation-delay:180ms">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-app2 font-medium">Inter-Node Latency</span>
+                        <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i>
+                    </div>
+                    <p class="text-xl font-bold text-app"><span id="nocLatencyVal">3.8</span> ms</p>
+                    <p class="text-[11px] text-emerald-500 font-semibold mt-1">Sub-5ms Target</p>
+                </div>
+
+                <div class="card p-5 fade-in" style="animation-delay:240ms">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-app2 font-medium">Packet Statistics</span>
+                        <i data-lucide="package" class="w-4 h-4 text-cyan-500"></i>
+                    </div>
+                    <p class="text-xl font-bold text-app"><span id="nocPacketVal">1,482,900</span></p>
+                    <p class="text-[11px] text-app2 mt-1">0.00% Loss Rate</p>
+                </div>
+
+                <div class="card p-5 fade-in" style="animation-delay:300ms">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-app2 font-medium">Raft Consensus</span>
+                        <i data-lucide="award" class="w-4 h-4 text-brand-500"></i>
+                    </div>
+                    <p class="text-xl font-bold text-brand-500">Term #42</p>
+                    <p class="text-[11px] text-app2 mt-1">Leader: Node 3000</p>
+                </div>
+            </section>
+
+            <!-- INTERACTIVE SVG MESH TOPOLOGY & NODE HOVER INSPECTOR -->
+            <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+
+                <!-- TOPOLOGY CANVAS (8 Cols) -->
+                <div class="lg:col-span-8 card p-6 fade-in" style="animation-delay:360ms">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="network" class="w-4 h-4 text-brand-500"></i>
+                            <h3 class="font-bold text-sm">Interactive SVG Node Mesh Topology</h3>
+                        </div>
+                        <span class="text-[11px] font-mono text-app2 bg-surface2 px-2.5 py-1 rounded-full border border-app">Hover Node for Telemetry</span>
+                    </div>
+
+                    <div class="w-full bg-surface2/30 border border-app rounded-2xl p-6 relative flex items-center justify-center min-h-[300px]">
+                        <svg width="700" height="260" viewBox="0 0 700 260" class="max-w-full">
+                            <!-- Mesh Lines between Triangle Nodes -->
+                            <line x1="400" y1="45" x2="180" y2="220" stroke="var(--border)" stroke-width="3" stroke-dasharray="6 6" />
+                            <line x1="180" y1="220" x2="620" y2="220" stroke="var(--border)" stroke-width="3" stroke-dasharray="6 6" />
+                            <line x1="620" y1="220" x2="400" y2="45" stroke="var(--border)" stroke-width="3" stroke-dasharray="6 6" />
+
+                            <!-- Animated Continuously Moving Orange Packets -->
+                            <circle cx="400" cy="45" r="5" fill="#F97316" class="packet-12" />
+                            <circle cx="180" cy="220" r="5" fill="#F59E0B" class="packet-23" />
+                            <circle cx="620" cy="220" r="5" fill="#06B6D4" class="packet-31" />
+
+                            <!-- NODE 3000 SVG (Top) -->
+                            <g transform="translate(400, 45)" cursor="pointer" onmouseover="inspectNode('Node 3000')" onclick="inspectNode('Node 3000')">
+                                <circle r="34" fill="var(--card)" stroke="#F97316" stroke-width="3.5" class="transition-transform hover:scale-110" />
+                                <circle r="6" fill="#F97316" class="pulse-dot" />
+                                <text x="0" y="-4" text-anchor="middle" fill="var(--text)" font-size="11" font-weight="bold">Node 3000</text>
+                                <text x="0" y="14" text-anchor="middle" fill="#F97316" font-size="9" font-weight="bold">LEADER</text>
+                            </g>
+
+                            <!-- NODE 4000 SVG (Bottom Left) -->
+                            <g transform="translate(180, 220)" cursor="pointer" onmouseover="inspectNode('Node 4000')" onclick="inspectNode('Node 4000')">
+                                <circle r="34" fill="var(--card)" stroke="#F59E0B" stroke-width="3.5" class="transition-transform hover:scale-110" />
+                                <circle r="6" fill="#F59E0B" />
+                                <text x="0" y="-4" text-anchor="middle" fill="var(--text)" font-size="11" font-weight="bold">Node 4000</text>
+                                <text x="0" y="14" text-anchor="middle" fill="#F59E0B" font-size="9" font-weight="bold">MIRROR 1</text>
+                            </g>
+
+                            <!-- NODE 5000 SVG (Bottom Right) -->
+                            <g transform="translate(620, 220)" cursor="pointer" onmouseover="inspectNode('Node 5000')" onclick="inspectNode('Node 5000')">
+                                <circle r="34" fill="var(--card)" stroke="#06B6D4" stroke-width="3.5" class="transition-transform hover:scale-110" />
+                                <circle r="6" fill="#06B6D4" />
+                                <text x="0" y="-4" text-anchor="middle" fill="var(--text)" font-size="11" font-weight="bold">Node 5000</text>
+                                <text x="0" y="14" text-anchor="middle" fill="#06B6D4" font-size="9" font-weight="bold">MIRROR 2</text>
+                            </g>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- LIVE HOVER NODE TELEMETRY INSPECTOR PANEL (4 Cols) -->
+                <div class="lg:col-span-4 card p-6 fade-in" style="animation-delay:420ms">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="cpu" class="w-4 h-4 text-brand-500"></i>
+                            <h3 id="inspectTitle" class="font-bold text-sm">Node 3000 Telemetry</h3>
+                        </div>
+                        <span id="inspectBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-500">LEADER</span>
+                    </div>
+
+                    <div class="card p-4 space-y-3 text-xs divide-y divide-app bg-surface2/30">
+                        <div class="py-1 flex justify-between">
+                            <span class="text-app2">Node IP Address</span>
+                            <span id="inspectIp" class="font-mono font-semibold">192.168.1.100:3000</span>
+                        </div>
+                        <div class="py-1 flex justify-between">
+                            <span class="text-app2">CPU Usage</span>
+                            <span id="inspectCpu" class="font-bold text-app">34%</span>
+                        </div>
+                        <div class="py-1 flex justify-between">
+                            <span class="text-app2">RAM Memory</span>
+                            <span id="inspectRam" class="font-bold text-app">58%</span>
+                        </div>
+                        <div class="py-1 flex justify-between">
+                            <span class="text-app2">Disk Usage</span>
+                            <span id="inspectDisk" class="font-bold text-app">70% (4.2 TB / 6 TB)</span>
+                        </div>
+                        <div class="py-1 flex justify-between">
+                            <span class="text-app2">Network Latency</span>
+                            <span id="inspectLatency" class="font-mono text-emerald-500">3.2 ms</span>
+                        </div>
+                        <div class="py-1 flex justify-between">
+                            <span class="text-app2">Bandwidth</span>
+                            <span id="inspectBandwidth" class="font-mono text-brand-500">180 MB/s</span>
+                        </div>
+                        <div class="py-1 flex justify-between">
+                            <span class="text-app2">Temperature</span>
+                            <span id="inspectTemp" class="font-semibold">42°C</span>
+                        </div>
+                        <div class="py-1 flex justify-between">
+                            <span class="text-app2">Total Files Stored</span>
+                            <span id="inspectFiles" class="font-semibold">540 Files</span>
+                        </div>
+                        <div class="py-1 flex justify-between">
+                            <span class="text-app2">Health Score</span>
+                            <span id="inspectHealth" class="font-bold text-emerald-500">98 / 100</span>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- LIVE CHUNK REPLICATION FLOW VISUALIZATION -->
+            <section class="card p-6 mb-6 fade-in" style="animation-delay:480ms">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="boxes" class="w-4 h-4 text-brand-500"></i>
+                        <h3 class="font-bold text-sm">Real-time Shard & Chunk Replication Flow</h3>
+                    </div>
+                    <span class="text-[11px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">Stream Sync Active</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs text-center">
+                    <div class="p-3.5 rounded-2xl bg-surface2/60 border border-app">
+                        <span class="text-[10px] text-app2 uppercase tracking-wider block mb-1">Incoming Stream</span>
+                        <div class="p-2 rounded-xl bg-card border border-app flex items-center justify-between">
+                            <span class="font-bold text-app truncate">annual-report-2026.pdf</span>
+                            <span class="text-brand-500 font-mono font-bold">24.8 MB</span>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 rounded-2xl bg-surface2/60 border border-app">
+                        <span class="text-[10px] text-app2 uppercase tracking-wider block mb-1">Chunk Splitter (64MB)</span>
+                        <div class="space-y-1">
+                            <span class="px-2 py-1 rounded bg-brand-500/10 text-brand-500 font-mono text-[10px] block font-semibold">Chunk 0x4F1A [Active]</span>
+                            <span class="px-2 py-1 rounded bg-surface2 text-app2 font-mono text-[10px] block">Chunk 0x892B [Queued]</span>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 rounded-2xl bg-surface2/60 border border-app">
+                        <span class="text-[10px] text-app2 uppercase tracking-wider block mb-1">Target Storage Nodes</span>
+                        <div class="flex items-center justify-center gap-1.5 font-mono text-[10px]">
+                            <span class="px-2 py-1 rounded bg-brand-500 text-white font-bold">Node 3000</span>
+                            <span class="px-2 py-1 rounded bg-amber-500 text-white font-bold">Node 4000</span>
+                            <span class="px-2 py-1 rounded bg-cyan-500 text-white font-bold">Node 5000</span>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 rounded-2xl bg-surface2/60 border border-app">
+                        <span class="text-[10px] text-app2 uppercase tracking-wider block mb-1">Status Verification</span>
+                        <span class="mt-1 inline-flex items-center gap-1 text-emerald-500 font-bold bg-emerald-500/10 px-3 py-1 rounded-full">
+                            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> 3/3 Replicated
+                        </span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- NOC TELEMETRY CHARTS ROW (3 Charts) -->
+            <section class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+                <!-- BANDWIDTH GRAPH -->
+                <div class="card p-5 fade-in" style="animation-delay:540ms">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="bar-chart-2" class="w-4 h-4 text-brand-500"></i>
+                            <h3 class="font-bold text-sm">Cluster Bandwidth (MB/s)</h3>
+                        </div>
+                    </div>
+                    <div class="h-[200px] relative">
+                        <canvas id="bandwidthChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- LATENCY GRAPH -->
+                <div class="card p-5 fade-in" style="animation-delay:600ms">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="line-chart" class="w-4 h-4 text-amber-500"></i>
+                            <h3 class="font-bold text-sm">Inter-Node Latency (ms)</h3>
+                        </div>
+                    </div>
+                    <div class="h-[200px] relative">
+                        <canvas id="latencyChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- REPLICATION SUCCESS GRAPH -->
+                <div class="card p-5 fade-in" style="animation-delay:660ms">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="trending-up" class="w-4 h-4 text-cyan-500"></i>
+                            <h3 class="font-bold text-sm">Replication SLA (%)</h3>
+                        </div>
+                    </div>
+                    <div class="h-[200px] relative">
+                        <canvas id="slaChart"></canvas>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- LIVE TERMINAL LOGS & REAL-TIME EVENT TIMELINE -->
+            <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+
+                <!-- LIVE SYSTEM LOGS TERMINAL (7 Cols) -->
+                <div class="lg:col-span-7 card p-5 font-mono fade-in" style="animation-delay:720ms">
+                    <div class="flex items-center justify-between mb-3 border-b border-app pb-2">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="terminal" class="w-4 h-4 text-brand-500"></i>
+                            <h3 class="font-bold text-xs font-sans">Live gRPC & Storage Cluster Logs</h3>
+                        </div>
+                        <span class="text-[10px] text-app2">Tail -f live stream</span>
+                    </div>
+
+                    <div id="nocTerminal" class="bg-black/80 text-slate-300 p-4 rounded-xl h-[260px] overflow-y-auto text-[11px] space-y-1.5 scrollbar-thin">
+                        <!-- Streamed log lines -->
+                    </div>
+                </div>
+
+                <!-- REAL-TIME EVENT TIMELINE (5 Cols) -->
+                <div class="lg:col-span-5 card p-5 fade-in" style="animation-delay:780ms">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="status-dot bg-brand-500 pulse-dot"></span>
+                            <h3 class="font-bold text-sm">Real-time Cluster Events</h3>
+                        </div>
+                        <span class="text-[11px] text-brand-500 font-semibold bg-brand-500/10 px-2 py-0.5 rounded-full">Stream</span>
+                    </div>
+
+                    <div id="nocTimeline" class="space-y-3 text-xs">
+                        <!-- Streamed events -->
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- FOOTER -->
+            <footer class="text-center text-[11px] text-app2 pt-10 pb-4">
+                NazeerDFS Enterprise · Distributed Cluster Monitor & Network Operations Center (NOC)
+            </footer>
+
+        </main>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        lucide.createIcons();
+
+        /* ---------------- THEME INITIALIZATION ---------------- */
+        const root = document.documentElement;
+        const themeToggle = document.getElementById('themeToggle');
+        const toggleThumb = document.getElementById('toggleThumb');
+        const toggleIconEl = document.getElementById('toggleIcon');
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                root.classList.add('dark');
+                toggleThumb.style.transform = 'translateX(24px)';
+                toggleIconEl.setAttribute('data-lucide', 'moon');
+            } else {
+                root.classList.remove('dark');
+                toggleThumb.style.transform = 'translateX(0px)';
+                toggleIconEl.setAttribute('data-lucide', 'sun');
+            }
+            lucide.createIcons();
+            updateAllCharts();
+        }
+
+        const savedTheme = localStorage.getItem('nazeerdfs-theme') ||
+            (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        applyTheme(savedTheme);
+
+        themeToggle.addEventListener('click', () => {
+            const next = root.classList.contains('dark') ? 'light' : 'dark';
+            localStorage.setItem('nazeerdfs-theme', next);
+            applyTheme(next);
+        });
+
+        /* ---------------- MOBILE SIDEBAR ---------------- */
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        document.getElementById('menuBtn').addEventListener('click', () => {
+            sidebar.classList.add('open');
+            overlay.classList.remove('hidden');
+        });
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay.classList.add('hidden');
+        });
+
+        /* ---------------- PROFILE DROPDOWN ---------------- */
+        const profileBtn = document.getElementById('profileBtn');
+        const profileDropdown = document.getElementById('profileDropdown');
+        profileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            profileDropdown.classList.toggle('hidden');
+        });
+        document.addEventListener('click', () => profileDropdown.classList.add('hidden'));
+
+        /* ---------------- RIPPLE EFFECT ---------------- */
+        document.querySelectorAll('.ripple').forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                const rect = this.getBoundingClientRect();
+                const circle = document.createElement('span');
+                const size = Math.max(rect.width, rect.height);
+                circle.className = 'ripple-effect';
+                circle.style.width = circle.style.height = size + 'px';
+                circle.style.left = (e.clientX - rect.left - size / 2) + 'px';
+                circle.style.top = (e.clientY - rect.top - size / 2) + 'px';
+                this.appendChild(circle);
+                setTimeout(() => circle.remove(), 600);
+            });
+        });
+
+        setTimeout(() => {
+            document.getElementById('sidebarStorageBar').style.width = '61%';
+        }, 300);
+
+        /* ---------------- TOAST NOTIFICATION ---------------- */
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'pointer-events-auto bg-card border border-app rounded-xl p-3.5 shadow-xl flex items-center gap-3 text-xs fade-in min-w-[260px] max-w-sm';
+            
+            const iconMap = {
+                info: '<i data-lucide="info" class="w-4 h-4 text-brand-500"></i>',
+                success: '<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i>',
+                warning: '<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>'
+            };
+
+            toast.innerHTML = `
+                <div class="flex-shrink-0">${iconMap[type] || iconMap.info}</div>
+                <div class="flex-1 font-medium text-app">${message}</div>
+            `;
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                toast.style.transition = 'all 300ms ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        /* ---------------- NODE TELEMETRY HOVER DATA ---------------- */
+        const nodeTelemetry = {
+            'Node 3000': { ip: '192.168.1.100:3000', badge: 'LEADER', badgeClass: 'bg-brand-500/10 text-brand-500', cpu: '34%', ram: '58%', disk: '70% (4.2 TB / 6 TB)', latency: '3.2 ms', bandwidth: '180 MB/s', temp: '42°C', files: '540 Files', health: '98 / 100' },
+            'Node 4000': { ip: '192.168.1.101:4000', badge: 'MIRROR 1', badgeClass: 'bg-amber-500/10 text-amber-500', cpu: '48%', ram: '62%', disk: '52% (2.1 TB / 4 TB)', latency: '5.1 ms', bandwidth: '140 MB/s', temp: '45°C', files: '480 Files', health: '95 / 100' },
+            'Node 5000': { ip: '192.168.1.102:5000', badge: 'MIRROR 2', badgeClass: 'bg-cyan-500/10 text-cyan-500', cpu: '22%', ram: '41%', disk: '50% (1.0 TB / 2 TB)', latency: '3.9 ms', bandwidth: '210 MB/s', temp: '39°C', files: '274 Files', health: '99 / 100' }
+        };
+
+        function inspectNode(nodeName) {
+            const data = nodeTelemetry[nodeName];
+            if (!data) return;
+
+            document.getElementById('inspectTitle').textContent = `${nodeName} Telemetry`;
+            const badgeEl = document.getElementById('inspectBadge');
+            badgeEl.textContent = data.badge;
+            badgeEl.className = `text-[10px] font-bold px-2 py-0.5 rounded-full ${data.badgeClass}`;
+
+            document.getElementById('inspectIp').textContent = data.ip;
+            document.getElementById('inspectCpu').textContent = data.cpu;
+            document.getElementById('inspectRam').textContent = data.ram;
+            document.getElementById('inspectDisk').textContent = data.disk;
+            document.getElementById('inspectLatency').textContent = data.latency;
+            document.getElementById('inspectBandwidth').textContent = data.bandwidth;
+            document.getElementById('inspectTemp').textContent = data.temp;
+            document.getElementById('inspectFiles').textContent = data.files;
+            document.getElementById('inspectHealth').textContent = data.health;
+        }
+
+        /* ---------------- CHARTS LOGIC ---------------- */
+        let bwChart, latChart, slaChart;
+
+        function updateAllCharts() {
+            if (!bwChart) return;
+            const isDark = root.classList.contains('dark');
+            const textColor = isDark ? '#CBD5E1' : '#475569';
+            const gridColor = isDark ? 'rgba(71, 85, 105, 0.2)' : 'rgba(203, 213, 225, 0.4)';
+
+            [bwChart, latChart, slaChart].forEach(c => {
+                c.options.scales.x.ticks.color = textColor;
+                c.options.scales.y.ticks.color = textColor;
+                c.options.scales.x.grid.color = gridColor;
+                c.options.scales.y.grid.color = gridColor;
+                c.update();
+            });
+        }
+
+        function initCharts() {
+            const isDark = root.classList.contains('dark');
+            const textColor = isDark ? '#CBD5E1' : '#475569';
+            const gridColor = isDark ? 'rgba(71, 85, 105, 0.2)' : 'rgba(203, 213, 225, 0.4)';
+
+            // Bandwidth
+            bwChart = new Chart(document.getElementById('bandwidthChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25'],
+                    datasets: [
+                        { label: 'Inbound', data: [110, 135, 120, 155, 142, 148], borderColor: '#F97316', tension: 0.4, borderWidth: 2, pointRadius: 0 },
+                        { label: 'Outbound', data: [85, 92, 105, 98, 110, 115], borderColor: '#06B6D4', tension: 0.4, borderWidth: 2, pointRadius: 0 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: textColor, font: { size: 10 } }, grid: { color: gridColor } },
+                        y: { ticks: { color: textColor, font: { size: 10 } }, grid: { color: gridColor } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // Latency
+            latChart = new Chart(document.getElementById('latencyChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Node 3000', 'Node 4000', 'Node 5000'],
+                    datasets: [{ data: [3.2, 5.1, 3.9], backgroundColor: ['#F97316', '#F59E0B', '#06B6D4'], borderRadius: 8 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: textColor, font: { size: 10 } }, grid: { display: false } },
+                        y: { ticks: { color: textColor, font: { size: 10 } }, grid: { color: gridColor } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // SLA
+            slaChart = new Chart(document.getElementById('slaChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [{ label: 'Replication SLA', data: [99.95, 99.98, 99.99, 99.97, 99.98, 99.99, 99.98], borderColor: '#10B981', fill: true, backgroundColor: 'rgba(16, 185, 129, 0.08)', tension: 0.4, borderWidth: 2, pointRadius: 0 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: textColor, font: { size: 10 } }, grid: { color: gridColor } },
+                        y: { min: 99.9, max: 100, ticks: { color: textColor, font: { size: 10 } }, grid: { color: gridColor } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+        initCharts();
+
+        /* ---------------- LIVE LOGS TERMINAL STREAM ---------------- */
+        const logLines = [
+            ['INFO', 'raft: leader heartbeat ACK received from node-3000 (rtt 0.3ms)'],
+            ['INFO', 'grpc: channel stream open node-3000 -> node-4000 [chunk 0x4f1a]'],
+            ['INFO', 'store: compaction completed on node-5000, freed 2.1 GB'],
+            ['WARN', 'gc pause 12ms on node-4000, below warning threshold'],
+            ['INFO', 'checksum: SHA-256 verified clean for annual-report-2026.pdf'],
+            ['INFO', 'raft: log entry #14920 commit index advanced to #14920']
+        ];
+        const terminalEl = document.getElementById('nocTerminal');
+
+        function pushLog() {
+            const [lvl, msg] = logLines[Math.floor(Math.random() * logLines.length)];
+            const time = new Date().toISOString().split('T')[1].split('.')[0];
+            const div = document.createElement('div');
+            div.className = 'terminal-line';
+            div.innerHTML = `<span class="text-slate-500">${time}</span> <span class="${lvl === 'WARN' ? 'text-amber-400' : 'text-emerald-400'} font-bold">${lvl.padEnd(5)}</span> <span class="text-slate-200">${msg}</span>`;
+            terminalEl.appendChild(div);
+            terminalEl.scrollTop = terminalEl.scrollHeight;
+            while (terminalEl.children.length > 25) terminalEl.removeChild(terminalEl.firstChild);
+        }
+
+        for (let i = 0; i < 8; i++) pushLog();
+        setInterval(pushLog, 1600);
+
+        /* ---------------- LIVE TIMELINE EVENTS ---------------- */
+        const eventItems = [
+            { text: 'Storage rebalanced across Node 3000 & 5000', icon: 'pie-chart', color: 'text-brand-500' },
+            { text: 'Chunk 0x892B mirrored to Node 4000', icon: 'copy', color: 'text-amber-500' },
+            { text: 'Raft consensus check passed (3/3 votes)', icon: 'award', color: 'text-emerald-500' }
+        ];
+        const timelineEl = document.getElementById('nocTimeline');
+
+        function pushEvent() {
+            const ev = eventItems[Math.floor(Math.random() * eventItems.length)];
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const item = document.createElement('div');
+            item.className = 'p-2.5 rounded-xl bg-surface2/50 border border-app hover:bg-surface2 transition-colors flex items-center justify-between fade-in';
+            item.innerHTML = `
+                <div class="flex items-center gap-2 min-w-0">
+                    <i data-lucide="${ev.icon}" class="w-3.5 h-3.5 ${ev.color} flex-shrink-0"></i>
+                    <span class="font-medium text-app truncate">${ev.text}</span>
+                </div>
+                <span class="text-[10px] font-mono text-app2 ml-2 flex-shrink-0">${time}</span>
+            `;
+            timelineEl.prepend(item);
+            lucide.createIcons();
+            while (timelineEl.children.length > 5) timelineEl.removeChild(timelineEl.lastChild);
+        }
+
+        for (let i = 0; i < 4; i++) pushEvent();
+        setInterval(pushEvent, 3600);
+
+        /* ---------------- BUTTON ACTIONS ---------------- */
+        document.getElementById('triggerRebalanceBtn').addEventListener('click', () => {
+            showToast('Cluster rebalancing triggered across Node 3000, 4000, 5000.', 'info');
+        });
+
+        document.getElementById('refreshNocBtn').addEventListener('click', () => {
+            const icon = document.getElementById('nocRefreshIcon');
+            icon.style.transition = 'transform 700ms ease';
+            icon.style.transform = 'rotate(360deg)';
+            setTimeout(() => { icon.style.transform = 'rotate(0deg)'; }, 700);
+            showToast('NOC telemetry pulse refreshed.', 'success');
+        });
+    </script>
+</body>
+
+</html>

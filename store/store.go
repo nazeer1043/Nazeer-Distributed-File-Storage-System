@@ -87,11 +87,11 @@ func (s *Store) WriteDecrypt(encryptKey []byte, id, key string, r io.Reader) (in
 	if err != nil {
 		return 0, err
 	}
+	defer f.Close()
 
 	n, err := crypto.CopyDecrypt(encryptKey, r, f)
 	return int64(n), err
 }
-
 func (s *Store) openFileForWriting(id, key string) (*os.File, error) {
 	pathKey := s.PathTransformFunc(key)
 	pathNameWithRoot := fmt.Sprintf("%s/%s/%s", s.Root, id, pathKey.PathName)
@@ -109,6 +109,7 @@ func (s *Store) writeStream(id, key string, r io.Reader) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	defer f.Close()
 
 	return io.Copy(f, r)
 }

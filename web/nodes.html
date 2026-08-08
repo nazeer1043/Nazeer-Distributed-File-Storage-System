@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Nodes — NazeerDFS Enterprise</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            DEFAULT: '#F97316',
+                            50: '#FFF7ED', 100: '#FFEDD5', 200: '#FED7AA', 300: '#FDBA74',
+                            400: '#FB923C', 500: '#F97316', 600: '#EA580C', 700: '#C2410C',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg: #F8FAFC;
+            --sidebar: #FFFFFF;
+            --card: #FFFFFF;
+            --surface2: #F1F5F9;
+            --border: #CBD5E1;
+            --text: #0F172A;
+            --text2: #475569;
+            --shadow-color: 15, 23, 42;
+        }
+
+        html.dark {
+            --bg: #0F172A;
+            --sidebar: #111827;
+            --card: #1E293B;
+            --surface2: #334155;
+            --border: #475569;
+            --text: #F8FAFC;
+            --text2: #CBD5E1;
+            --shadow-color: 0, 0, 0;
+        }
+
+        * {
+            transition: background-color 380ms ease, border-color 380ms ease, color 380ms ease, box-shadow 380ms ease;
+        }
+
+        html,
+        body {
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .bg-app {
+            background: var(--bg);
+        }
+
+        .bg-sidebar {
+            background: var(--sidebar);
+        }
+
+        .bg-card {
+            background: var(--card);
+        }
+
+        .bg-surface2 {
+            background: var(--surface2);
+        }
+
+        .border-app {
+            border-color: var(--border);
+        }
+
+        .text-app {
+            color: var(--text);
+        }
+
+        .text-app2 {
+            color: var(--text2);
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow: 0 1px 2px rgba(var(--shadow-color), 0.04), 0 8px 24px -12px rgba(var(--shadow-color), 0.12);
+            transition: transform 240ms cubic-bezier(.2, .8, .2, 1), box-shadow 240ms ease, background-color 380ms ease, border-color 380ms ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 12px rgba(var(--shadow-color), 0.06), 0 16px 40px -14px rgba(var(--shadow-color), 0.18);
+            transform: translateY(-2px);
+        }
+
+        .glass {
+            backdrop-filter: blur(20px) saturate(160%);
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            background: color-mix(in srgb, var(--card) 72%, transparent);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 8px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #F97316;
+        }
+
+        .nav-item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            color: var(--text2);
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 200ms ease;
+        }
+
+        .nav-item:hover {
+            background: var(--surface2);
+            color: var(--text);
+            transform: translateX(2px);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.14), rgba(249, 115, 22, 0.06));
+            color: #F97316;
+        }
+
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: -14px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 22px;
+            background: #F97316;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .nav-item i {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeInUp 560ms cubic-bezier(.2, .8, .2, 1) both;
+        }
+
+        @keyframes pulseDot {
+            0% {
+                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.55);
+            }
+
+            70% {
+                box-shadow: 0 0 0 8px rgba(249, 115, 22, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+            }
+        }
+
+        .pulse-dot {
+            animation: pulseDot 2s infinite;
+        }
+
+        @keyframes pulseGreen {
+            0% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55);
+            }
+
+            70% {
+                box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+
+        .pulse-green {
+            animation: pulseGreen 2s infinite;
+        }
+
+        @keyframes pulseRed {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55);
+            }
+
+            70% {
+                box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+
+        .pulse-red {
+            animation: pulseRed 2s infinite;
+        }
+
+        @keyframes shimmerBar {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        .bar-shimmer::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+            animation: shimmerBar 1.6s infinite;
+        }
+
+        .ripple {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ripple-effect {
+            position: absolute;
+            border-radius: 50%;
+            transform: scale(0);
+            background: rgba(255, 255, 255, 0.5);
+            animation: rippleAnim 600ms ease-out;
+            pointer-events: none;
+        }
+
+        @keyframes rippleAnim {
+            to {
+                transform: scale(3);
+                opacity: 0;
+            }
+        }
+
+        .progress-fill {
+            transition: width 900ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        #sidebar {
+            transition: transform 320ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .toggle-track {
+            transition: background-color 380ms ease;
+        }
+
+        .toggle-thumb {
+            transition: transform 380ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        @media (max-width: 1024px) {
+            #sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+                z-index: 40;
+                height: 100vh;
+            }
+
+            #sidebar.open {
+                transform: translateX(0);
+            }
+        }
+
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        input:focus,
+        button:focus-visible,
+        select:focus,
+        a:focus-visible {
+            outline: 2px solid #F97316;
+            outline-offset: 2px;
+        }
+
+        /* Network Connection Moving Packet animation */
+        @keyframes networkPacketA {
+            0% {
+                cx: 120;
+                cy: 60;
+                opacity: 0.2;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                cx: 400;
+                cy: 60;
+                opacity: 0.2;
+            }
+        }
+
+        @keyframes networkPacketB {
+            0% {
+                cx: 400;
+                cy: 60;
+                opacity: 0.2;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                cx: 680;
+                cy: 60;
+                opacity: 0.2;
+            }
+        }
+
+        .packet-a {
+            animation: networkPacketA 2.4s infinite cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .packet-b {
+            animation: networkPacketB 2.4s infinite cubic-bezier(0.4, 0, 0.2, 1) 1.2s;
+        }
+    </style>
+</head>
+
+<body class="bg-app text-app font-sans antialiased min-h-screen">
+
+    <div id="overlay" class="fixed inset-0 bg-black/40 z-30 hidden lg:hidden"></div>
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="w-[280px] bg-sidebar border-r border-app fixed top-0 left-0 h-screen flex flex-col z-40">
+        <div class="h-[72px] flex items-center gap-3 px-6 border-b border-app flex-shrink-0">
+            <div
+                class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
+                <i data-lucide="hexagon" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="leading-tight">
+                <p class="font-bold text-[15px] tracking-tight">NazeerDFS</p>
+                <p class="text-[11px] text-app2">Enterprise Distributed Storage</p>
+            </div>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto px-4 py-5 space-y-1 scrollbar-thin">
+            <p class="px-3 text-[11px] font-semibold uppercase tracking-wider text-app2 mb-2">Workspace</p>
+            <a href="dashboard.html" class="nav-item" data-page="dashboard"><i
+                    data-lucide="layout-dashboard"></i>Dashboard</a>
+            <a href="files.html" class="nav-item" data-page="files"><i data-lucide="folder"></i>My Files</a>
+            <a href="upload.html" class="nav-item" data-page="upload"><i data-lucide="upload-cloud"></i>Upload Center</a>
+            <a href="nodes.html" class="nav-item active" data-page="nodes"><i data-lucide="server"></i>Storage Nodes</a>
+            <a href="cluster.html" class="nav-item" data-page="cluster"><i data-lucide="globe"></i>Cluster Monitor</a>
+            <a href="settings.html" class="nav-item" data-page="settings"><i data-lucide="settings"></i>Settings</a>
+        </nav>
+
+        <div class="px-4 pb-4">
+            <div class="card !rounded-2xl p-4 mb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-app2">Storage Used</span>
+                    <span class="text-xs font-semibold text-brand-500">61%</span>
+                </div>
+                <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
+                    <div id="sidebarStorageBar"
+                        class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill"
+                        style="width:0%"></div>
+                </div>
+                <p class="text-[11px] text-app2 mt-2">7.3 TB of 12 TB used</p>
+            </div>
+            <p class="text-[11px] text-app2 text-center mb-3">Version 1.0.4</p>
+        </div>
+
+        <div class="border-t border-app p-4 flex items-center gap-3">
+            <img src="https://api.dicebear.com/7.x/notionists/svg?seed=Arjun"
+                class="w-9 h-9 rounded-full bg-surface2 flex-shrink-0" alt="User avatar">
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold truncate">Arjun Nazeer</p>
+                <p class="text-[11px] text-app2 truncate">Cluster Admin</p>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-app2 flex-shrink-0"></i>
+        </div>
+    </aside>
+
+    <!-- MAIN WRAPPER -->
+    <div class="lg:ml-[280px]">
+
+        <!-- NAVBAR -->
+        <header
+            class="h-[72px] bg-sidebar/90 glass border-b border-app fixed top-0 right-0 left-0 lg:left-[280px] z-20 flex items-center px-4 md:px-6 gap-4">
+            <button id="menuBtn" class="lg:hidden p-2 rounded-lg hover:bg-surface2">
+                <i data-lucide="menu" class="w-5 h-5"></i>
+            </button>
+
+            <div class="flex-shrink-0 hidden md:block">
+                <h1 class="text-[15px] font-semibold">Storage Nodes</h1>
+            </div>
+
+            <div class="flex-1 max-w-xl mx-auto hidden sm:block">
+                <div class="relative">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-app2"></i>
+                    <input type="text" id="globalNavSearch" placeholder="Search storage nodes, IPs, or active tasks…"
+                        class="w-full bg-surface2 border border-app rounded-xl pl-10 pr-4 py-2 text-sm placeholder:text-app2 focus:bg-card outline-none">
+                    <kbd
+                        class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] px-1.5 py-0.5 rounded border border-app text-app2 hidden md:block">⌘K</kbd>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 ml-auto">
+                <button id="themeToggle"
+                    class="relative w-[52px] h-[28px] rounded-full toggle-track bg-surface2 border border-app flex items-center px-1"
+                    aria-label="Toggle theme">
+                    <span id="toggleThumb"
+                        class="toggle-thumb w-[20px] h-[20px] rounded-full bg-white shadow flex items-center justify-center">
+                        <i data-lucide="moon" id="toggleIcon" class="w-3 h-3 text-slate-700"></i>
+                    </span>
+                </button>
+
+                <button class="relative p-2.5 rounded-xl hover:bg-surface2" aria-label="Notifications">
+                    <i data-lucide="bell" class="w-[18px] h-[18px]"></i>
+                    <span class="pulse-dot absolute top-2 right-2 w-2 h-2 bg-brand-500 rounded-full"></span>
+                </button>
+
+                <div class="relative">
+                    <button id="profileBtn" class="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-surface2">
+                        <img src="https://api.dicebear.com/7.x/notionists/svg?seed=Arjun"
+                            class="w-8 h-8 rounded-full bg-surface2" alt="Profile">
+                        <i data-lucide="chevron-down" class="w-4 h-4 text-app2 hidden md:block"></i>
+                    </button>
+                    <div id="profileDropdown" class="hidden absolute right-0 mt-2 w-52 card p-1.5 text-sm z-50">
+                        <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                                data-lucide="user" class="w-4 h-4"></i>Profile</a>
+                        <a href="settings.html" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                                data-lucide="settings" class="w-4 h-4"></i>Settings</a>
+                        <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                                data-lucide="key" class="w-4 h-4"></i>API Keys</a>
+                        <div class="h-px bg-app my-1"></div>
+                        <a href="#"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2 text-red-500"><i
+                                data-lucide="log-out" class="w-4 h-4"></i>Sign out</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="pt-[72px] px-4 md:px-8 pb-16 max-w-[1600px] mx-auto">
+
+            <!-- PAGE HEADER -->
+            <section class="fade-in mt-6 mb-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-semibold text-brand-500 uppercase tracking-wider">Node Infrastructure</span>
+                            <span class="text-app2">•</span>
+                            <span class="text-xs text-app2">Multi-Region Distributed Fabric</span>
+                        </div>
+                        <h2 class="text-2xl md:text-3xl font-bold tracking-tight">Storage Nodes</h2>
+                        <p class="text-app2 text-sm mt-1">Monitor the health, performance and capacity of every storage node inside the distributed cluster.</p>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button id="refreshClusterBtn"
+                            class="ripple flex items-center gap-2 bg-surface2 hover:bg-surface2/80 text-app border border-app font-medium text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm">
+                            <i data-lucide="refresh-cw" id="refreshIcon" class="w-4 h-4 text-brand-500"></i>
+                            <span>Refresh Cluster</span>
+                        </button>
+
+                        <button id="addNodeBtn"
+                            class="ripple flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-medium text-sm px-5 py-2.5 rounded-xl shadow-lg shadow-brand-500/25 transition-all">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                            <span>Add Node</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- HERO OVERVIEW CARD -->
+            <section class="fade-in mb-6" style="animation-delay:60ms">
+                <div class="card !rounded-3xl p-6 md:p-8 relative overflow-hidden">
+                    <div class="absolute -top-24 -right-24 w-80 h-80 bg-brand-500/10 rounded-full blur-3xl"></div>
+                    <div class="relative flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+                        <div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full">
+                                    <span class="status-dot bg-emerald-500 pulse-green"></span> OPERATIONAL
+                                </span>
+                                <span class="text-xs text-app2">Raft Consensus Protocol Active</span>
+                            </div>
+                            <h3 class="text-xl md:text-2xl font-bold tracking-tight">Cluster Storage Mesh Overview</h3>
+                            <p class="text-app2 text-sm mt-1 max-w-xl">3 active nodes distributing 7.3 TB across storage pools with sub-5ms low latency read/write pipelines.</p>
+                        </div>
+
+                        <!-- Metric Badges Grid -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full xl:w-auto">
+                            <div class="bg-surface2/70 rounded-2xl px-4 py-3 text-center border border-app">
+                                <p class="text-xs text-app2 mb-0.5">Cluster Health</p>
+                                <p class="text-base font-bold text-emerald-500">Healthy</p>
+                                <p class="text-[10px] text-app2">3 Active Nodes</p>
+                            </div>
+                            <div class="bg-surface2/70 rounded-2xl px-4 py-3 text-center border border-app">
+                                <p class="text-xs text-app2 mb-0.5">Total Capacity</p>
+                                <p class="text-base font-bold text-app">12 TB</p>
+                                <p class="text-[10px] text-brand-500 font-semibold">7.3 TB Used</p>
+                            </div>
+                            <div class="bg-surface2/70 rounded-2xl px-4 py-3 text-center border border-app">
+                                <p class="text-xs text-app2 mb-0.5">Avg Latency</p>
+                                <p class="text-base font-bold text-brand-500"><span id="heroAvgLatency">4</span> ms</p>
+                                <p class="text-[10px] text-app2">Bandwidth: 45 MB/s</p>
+                            </div>
+                            <div class="bg-surface2/70 rounded-2xl px-4 py-3 text-center border border-app">
+                                <p class="text-xs text-app2 mb-0.5">Replication SLA</p>
+                                <p class="text-base font-bold text-app">99.98%</p>
+                                <p class="text-[10px] text-emerald-500 font-semibold">Zero Failures</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- NODE HEALTH SUMMARY CARDS (4 Cards) -->
+            <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+                <div class="card p-5 fade-in" style="animation-delay:120ms">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                            <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                        </div>
+                        <span class="text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">100% Online</span>
+                    </div>
+                    <p class="text-2xl font-bold tracking-tight"><span id="healthNodesCount">3</span> / 3</p>
+                    <p class="text-xs text-app2 mt-1">Healthy Active Nodes</p>
+                </div>
+
+                <div class="card p-5 fade-in" style="animation-delay:180ms">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500">
+                            <i data-lucide="x-circle" class="w-5 h-5"></i>
+                        </div>
+                        <span class="text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">0 Failures</span>
+                    </div>
+                    <p class="text-2xl font-bold tracking-tight">0</p>
+                    <p class="text-xs text-app2 mt-1">Offline Storage Nodes</p>
+                </div>
+
+                <div class="card p-5 fade-in" style="animation-delay:240ms">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
+                            <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                        </div>
+                        <span class="text-[11px] font-medium text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">Sync Delay</span>
+                    </div>
+                    <p class="text-2xl font-bold tracking-tight">1</p>
+                    <p class="text-xs text-app2 mt-1">Cluster Warnings</p>
+                </div>
+
+                <div class="card p-5 fade-in" style="animation-delay:300ms">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center text-brand-500">
+                            <i data-lucide="cpu" class="w-5 h-5"></i>
+                        </div>
+                        <span class="text-[11px] font-medium text-brand-500 bg-brand-500/10 px-2 py-0.5 rounded-full">Optimal Load</span>
+                    </div>
+                    <p class="text-2xl font-bold tracking-tight"><span id="avgClusterLoad">42</span>%</p>
+                    <p class="text-xs text-app2 mt-1">Average Cluster CPU Load</p>
+                </div>
+            </section>
+
+            <!-- NETWORK CONNECTIONS SVG VISUALIZER -->
+            <section class="card p-6 mb-6 fade-in" style="animation-delay:360ms">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="network" class="w-4 h-4 text-brand-500"></i>
+                        <h3 class="font-bold text-sm">Inter-Node Mesh Network Topology</h3>
+                    </div>
+                    <span class="text-[11px] font-semibold text-brand-500 bg-brand-500/10 px-2.5 py-0.5 rounded-full">Live Packet Transit</span>
+                </div>
+
+                <!-- SVG Diagram -->
+                <div class="w-full overflow-x-auto bg-surface2/40 rounded-2xl p-4 border border-app flex justify-center">
+                    <svg width="800" height="120" viewBox="0 0 800 120" class="max-w-full">
+                        <!-- Connection Lines -->
+                        <line x1="120" y1="60" x2="400" y2="60" stroke="var(--border)" stroke-width="3" stroke-dasharray="6 6" />
+                        <line x1="400" y1="60" x2="680" y2="60" stroke="var(--border)" stroke-width="3" stroke-dasharray="6 6" />
+
+                        <!-- Animated Moving Packets -->
+                        <circle cx="120" cy="60" r="5" fill="#F97316" class="packet-a" />
+                        <circle cx="400" cy="60" r="5" fill="#F97316" class="packet-b" />
+
+                        <!-- Node 3000 SVG Circle Group -->
+                        <g transform="translate(120, 60)" cursor="pointer" onclick="showToast('Selected Node 3000 (Leader)', 'info')">
+                            <circle r="36" fill="var(--card)" stroke="#F97316" stroke-width="3" />
+                            <text x="0" y="-4" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="bold">Node 3000</text>
+                            <text x="0" y="14" text-anchor="middle" fill="#F97316" font-size="10" font-weight="semibold">Leader</text>
+                        </g>
+
+                        <!-- Node 4000 SVG Circle Group -->
+                        <g transform="translate(400, 60)" cursor="pointer" onclick="showToast('Selected Node 4000 (Follower)', 'info')">
+                            <circle r="36" fill="var(--card)" stroke="#F59E0B" stroke-width="3" />
+                            <text x="0" y="-4" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="bold">Node 4000</text>
+                            <text x="0" y="14" text-anchor="middle" fill="#F59E0B" font-size="10" font-weight="semibold">Replica 1</text>
+                        </g>
+
+                        <!-- Node 5000 SVG Circle Group -->
+                        <g transform="translate(680, 60)" cursor="pointer" onclick="showToast('Selected Node 5000 (Follower)', 'info')">
+                            <circle r="36" fill="var(--card)" stroke="#06B6D4" stroke-width="3" />
+                            <text x="0" y="-4" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="bold">Node 5000</text>
+                            <text x="0" y="14" text-anchor="middle" fill="#06B6D4" font-size="10" font-weight="semibold">Replica 2</text>
+                        </g>
+
+                        <!-- Latency Badges -->
+                        <rect x="235" y="45" width="50" height="20" rx="10" fill="var(--surface2)" stroke="var(--border)" />
+                        <text x="260" y="59" text-anchor="middle" fill="var(--text2)" font-size="10" font-family="monospace">3 ms</text>
+
+                        <rect x="515" y="45" width="50" height="20" rx="10" fill="var(--surface2)" stroke="var(--border)" />
+                        <text x="540" y="59" text-anchor="middle" fill="var(--text2)" font-size="10" font-family="monospace">4 ms</text>
+                    </svg>
+                </div>
+            </section>
+
+            <!-- THREE DETAILED NODE CARDS -->
+            <section class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+                <!-- NODE 3000 CARD -->
+                <div class="card p-6 fade-in" style="animation-delay:420ms">
+                    <div class="flex items-start justify-between mb-4 border-b border-app pb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-2xl bg-brand-500/10 flex items-center justify-center text-brand-500 shadow-md shadow-brand-500/10">
+                                <i data-lucide="server" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-bold text-base">Node 3000</h3>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-brand-500/10 text-brand-500">Raft Leader</span>
+                                </div>
+                                <p class="text-xs font-mono text-app2">192.168.1.100:3000</p>
+                            </div>
+                        </div>
+
+                        <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500">
+                            <span class="status-dot bg-emerald-500 pulse-green"></span> Online
+                        </span>
+                    </div>
+
+                    <!-- Health Score & Temp -->
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div class="p-3 rounded-xl bg-surface2/60 border border-app text-center">
+                            <p class="text-[11px] text-app2">Health Score</p>
+                            <p class="text-lg font-bold text-emerald-500">98 <span class="text-xs font-normal text-app2">/ 100</span></p>
+                        </div>
+                        <div class="p-3 rounded-xl bg-surface2/60 border border-app text-center">
+                            <p class="text-[11px] text-app2">Temperature</p>
+                            <p class="text-lg font-bold text-app"><span id="node3000Temp">42</span>°C</p>
+                        </div>
+                    </div>
+
+                    <!-- Resource Progress Bars -->
+                    <div class="space-y-3 mb-5">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-app2">CPU Load</span>
+                                <span id="n3000CpuVal" class="font-bold text-app">34%</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
+                                <div id="n3000CpuBar" class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill" style="width: 34%"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-app2">RAM Memory</span>
+                                <span id="n3000RamVal" class="font-bold text-app">58%</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
+                                <div id="n3000RamBar" class="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full progress-fill" style="width: 58%"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-app2">Disk Usage (4.2 TB / 6 TB)</span>
+                                <span class="font-bold text-app">70%</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill" style="width: 70%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Properties Grid -->
+                    <div class="card p-3 divide-y divide-app text-xs mb-5">
+                        <div class="py-1.5 flex justify-between">
+                            <span class="text-app2">Files Stored</span>
+                            <span class="font-semibold">540 Files</span>
+                        </div>
+                        <div class="py-1.5 flex justify-between">
+                            <span class="text-app2">Read / Write Speed</span>
+                            <span class="font-mono text-emerald-500">180 MB/s · 120 MB/s</span>
+                        </div>
+                        <div class="py-1.5 flex justify-between">
+                            <span class="text-app2">Network Latency</span>
+                            <span class="font-mono">3 ms</span>
+                        </div>
+                        <div class="py-1.5 flex justify-between">
+                            <span class="text-app2">Node Uptime</span>
+                            <span class="font-mono text-app">45d 12h 10m</span>
+                        </div>
+                    </div>
+
+                    <!-- Node Demo Action Buttons -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="pingNode('Node 3000')" class="py-2 rounded-xl bg-surface2 hover:bg-surface2/80 text-xs font-medium border border-app flex items-center justify-center gap-1.5">
+                            <i data-lucide="radio" class="w-3.5 h-3.5 text-brand-500"></i> Ping Node
+                        </button>
+                        <button onclick="restartNode('Node 3000')" class="py-2 rounded-xl bg-surface2 hover:bg-surface2/80 text-xs font-medium border border-app flex items-center justify-center gap-1.5">
+                            <i data-lucide="rotate-cw" class="w-3.5 h-3.5 text-amber-500"></i> Restart Node
+                        </button>
+                        <button onclick="healthReport('Node 3000')" class="py-2 rounded-xl bg-surface2 hover:bg-surface2/80 text-xs font-medium border border-app flex items-center justify-center gap-1.5">
+                            <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-blue-500"></i> Health Report
+                        </button>
+                        <a href="files.html" class="py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5">
+                            <i data-lucide="folder" class="w-3.5 h-3.5"></i> View Files
+                        </a>
+                    </div>
+                </div>
+
+                <!-- NODE 4000 CARD -->
+                <div class="card p-6 fade-in" style="animation-delay:480ms">
+                    <div class="flex items-start justify-between mb-4 border-b border-app pb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 shadow-md shadow-amber-500/10">
+                                <i data-lucide="cpu" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-bold text-base">Node 4000</h3>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/10 text-amber-500">Follower</span>
+                                </div>
+                                <p class="text-xs font-mono text-app2">192.168.1.101:4000</p>
+                            </div>
+                        </div>
+
+                        <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500">
+                            <span class="status-dot bg-emerald-500 pulse-green"></span> Online
+                        </span>
+                    </div>
+
+                    <!-- Health Score & Temp -->
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div class="p-3 rounded-xl bg-surface2/60 border border-app text-center">
+                            <p class="text-[11px] text-app2">Health Score</p>
+                            <p class="text-lg font-bold text-emerald-500">95 <span class="text-xs font-normal text-app2">/ 100</span></p>
+                        </div>
+                        <div class="p-3 rounded-xl bg-surface2/60 border border-app text-center">
+                            <p class="text-[11px] text-app2">Temperature</p>
+                            <p class="text-lg font-bold text-app"><span id="node4000Temp">45</span>°C</p>
+                        </div>
+                    </div>
+
+                    <!-- Resource Progress Bars -->
+                    <div class="space-y-3 mb-5">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-app2">CPU Load</span>
+                                <span id="n4000CpuVal" class="font-bold text-app">48%</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
+                                <div id="n4000CpuBar" class="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full progress-fill" style="width: 48%"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-app2">RAM Memory</span>
+                                <span id="n4000RamVal" class="font-bold text-app">62%</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
+                                <div id="n4000RamBar" class="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full progress-fill" style="width: 62%"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-app2">Disk Usage (2.1 TB / 4 TB)</span>
+                                <span class="font-bold text-app">52%</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill" style="width: 52%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Properties Grid -->
+                    <div class="card p-3 divide-y divide-app text-xs mb-5">
+                        <div class="py-1.5 flex justify-between">
+                            <span class="text-app2">Files Stored</span>
+                            <span class="font-semibold">480 Files</span>
+                        </div>
+                        <div class="py-1.5 flex justify-between">
+                            <span class="text-app2">Read / Write Speed</span>
+                            <span class="font-mono text-emerald-500">140 MB/s · 95 MB/s</span>
+                        </div>
+                        <div class="py-1.5 flex justify-between">
+                            <span class="text-app2">Network Latency</span>
+                            <span class="font-mono">5 ms</span>
+                        </div>
+                        <div class="py-1.5 flex justify-between">
+                            <span class="text-app2">Node Uptime</span>
+                            <span class="font-mono text-app">32d 08h 40m</span>
+                        </div>
+                    </div>
+
+                    <!-- Node Demo Action Buttons -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="pingNode('Node 4000')" class="py-2 rounded-xl bg-surface2 hover:bg-surface2/80 text-xs font-medium border border-app flex items-center justify-center gap-1.5">
+                            <i data-lucide="radio" class="w-3.5 h-3.5 text-brand-500"></i> Ping Node
+                        </button>
+                        <button onclick="restartNode('Node 4000')" class="py-2 rounded-xl bg-surface2 hover:bg-surface2/80 text-xs font-medium border border-app flex items-center justify-center gap-1.5">
+                            <i data-lucide="rotate-cw" class="w-3.5 h-3.5 text-amber-500"></i> Restart Node
+                        </button>
+                        <button onclick="healthReport('Node 4000')" class="py-2 rounded-xl bg-surface2 hover:bg-surface2/80 text-xs font-medium border border-app flex items-center justify-center gap-1.5">
+                            <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-blue-500"></i> Health Report
+                        </button>
+                        <a href="files.html" class="py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5">
+                            <i data-lucide="folder" class="w-3.5 h-3.5"></i> View Files
+                        </a>
+                    </div>
+                </div>
+
+                <!-- NODE 5000 CARD -->
+                <div class="card p-6 fade-in" style="animation-delay:540ms">
+                    <div class="flex items-start justify-between mb-4 border-b border-app pb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-2xl bg-cyan-500/10 flex items-center justify-center text-cyan-500 shadow-md shadow-cyan-500/10">
+                                <i data-lucide="hard-drive" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-bold text-base">Node 5000</h3>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-cyan-500/10 text-cyan-500">Follower</span>
+                                </div>
+                                <p class="text-xs font-mono text-app2">192.168.1.102:5000</p>
+                            </div>
+                        </div>
+
+                        <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500">
+                            <span class="status-dot bg-emerald-500 pulse-green"></span> Online
+                        </span>
+                    </div>
+
+                    <!-- Health Score & Temp -->
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div class="p-3 rounded-xl bg-surface2/60 border border-app text-center">
+                            <p class="text-[11px] text-app2">Health Score</p>
+                            <p class="text-lg font-bold text-emerald-500">99 <span class="text-xs font-normal text-app2">/ 100</span></p>
+                        </div>
+                        <div class="p-3 rounded-xl bg-surface2/60 border border-app text-center">
+                            <p class="text-[11px] text-app2">Temperature</p>
+                            <p class="text-lg font-bold text-app"><span id="node5000Temp">39</span>°C</p>
+                        </div>
+                    </div>
+
+                    <!-- Resource Progress Bars -->
+                    <div class="space-y-3 mb-5">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-app2">CPU Load</span>
+                                <span id="n5000CpuVal" class="font-bold text-app">22%</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
+                                <div id="n5000CpuBar" class="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-full progress-fill" style="width: 22%"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-app2">RAM Memory</span>
+                                <span id="n5000RamVal" class="font-bold text-app">41%</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
+                                <div id="n5000RamBar" class="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-full progress-fill" style="width: 41%"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-app2">Disk Usage (1.0 TB / 2 TB)</span>
+                                <span class="font-bold text-app">50%</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill" style="width: 50%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Properties Grid -->
+                    <div class="card p-3 divide-y divide-app text-xs mb-5">
+                        <div class="py-1.5 flex justify-between">
+                            <span class="text-app2">Files Stored</span>
+                            <span class="font-semibold">274 Files</span>
+                        </div>
+                        <div class="py-1.5 flex justify-between">
+                            <span class="text-app2">Read / Write Speed</span>
+                            <span class="font-mono text-emerald-500">210 MB/s · 150 MB/s</span>
+                        </div>
+                        <div class="py-1.5 flex justify-between">
+                            <span class="text-app2">Network Latency</span>
+                            <span class="font-mono">4 ms</span>
+                        </div>
+                        <div class="py-1.5 flex justify-between">
+                            <span class="text-app2">Node Uptime</span>
+                            <span class="font-mono text-app">18d 04h 15m</span>
+                        </div>
+                    </div>
+
+                    <!-- Node Demo Action Buttons -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="pingNode('Node 5000')" class="py-2 rounded-xl bg-surface2 hover:bg-surface2/80 text-xs font-medium border border-app flex items-center justify-center gap-1.5">
+                            <i data-lucide="radio" class="w-3.5 h-3.5 text-brand-500"></i> Ping Node
+                        </button>
+                        <button onclick="restartNode('Node 5000')" class="py-2 rounded-xl bg-surface2 hover:bg-surface2/80 text-xs font-medium border border-app flex items-center justify-center gap-1.5">
+                            <i data-lucide="rotate-cw" class="w-3.5 h-3.5 text-amber-500"></i> Restart Node
+                        </button>
+                        <button onclick="healthReport('Node 5000')" class="py-2 rounded-xl bg-surface2 hover:bg-surface2/80 text-xs font-medium border border-app flex items-center justify-center gap-1.5">
+                            <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-blue-500"></i> Health Report
+                        </button>
+                        <a href="files.html" class="py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5">
+                            <i data-lucide="folder" class="w-3.5 h-3.5"></i> View Files
+                        </a>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- MAIN GRID: LEFT 2 COLS (Active Operations & Live Events) + RIGHT 1 COL (Storage Donut Chart & Cluster Summary) -->
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+                <!-- LEFT / CENTER SECTION (2 Cols wide) -->
+                <div class="xl:col-span-2 space-y-6">
+
+                    <!-- ACTIVE NODE OPERATIONS TABLE -->
+                    <div class="card overflow-hidden fade-in" style="animation-delay:600ms">
+                        <div class="p-4 border-b border-app flex items-center justify-between bg-surface2/30">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="activity" class="w-4 h-4 text-brand-500"></i>
+                                <h3 class="font-bold text-sm">Active Node Operations</h3>
+                            </div>
+                            <span class="text-[11px] font-semibold text-brand-500 bg-brand-500/10 px-2 py-0.5 rounded-full">3 Tasks Running</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm border-collapse">
+                                <thead>
+                                    <tr class="border-b border-app bg-surface2/50 text-[11px] font-semibold text-app2 uppercase tracking-wider">
+                                        <th class="py-3.5 px-4">Node</th>
+                                        <th class="py-3.5 px-4">Operation</th>
+                                        <th class="py-3.5 px-4">File Target</th>
+                                        <th class="py-3.5 px-4">Progress</th>
+                                        <th class="py-3.5 px-4">Speed</th>
+                                        <th class="py-3.5 px-4">Remaining</th>
+                                        <th class="py-3.5 px-4 text-right">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="activeOpsTable" class="divide-y divide-app text-xs">
+                                    <!-- Dynamic rows -->
+                                    <tr class="border-b border-app hover:bg-surface2/60 transition-colors">
+                                        <td class="py-3.5 px-4 font-mono font-semibold text-brand-500">Node 3000</td>
+                                        <td class="py-3.5 px-4 font-medium">Replicating</td>
+                                        <td class="py-3.5 px-4 text-app font-medium truncate max-w-[160px]">annual-report-2026.pdf</td>
+                                        <td class="py-3.5 px-4 w-32">
+                                            <div class="flex justify-between text-[10px] mb-1 font-mono">
+                                                <span>82%</span>
+                                            </div>
+                                            <div class="w-full h-1.5 rounded-full bg-surface2 overflow-hidden">
+                                                <div class="h-full bg-brand-500 rounded-full progress-fill" style="width: 82%"></div>
+                                            </div>
+                                        </td>
+                                        <td class="py-3.5 px-4 font-mono text-app2">42 MB/s</td>
+                                        <td class="py-3.5 px-4 font-mono text-app2">15 sec</td>
+                                        <td class="py-3.5 px-4 text-right">
+                                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-emerald-500 bg-emerald-500/10">Running</span>
+                                        </td>
+                                    </tr>
+                                    <tr class="border-b border-app hover:bg-surface2/60 transition-colors">
+                                        <td class="py-3.5 px-4 font-mono font-semibold text-amber-500">Node 4000</td>
+                                        <td class="py-3.5 px-4 font-medium">Compacting Chunks</td>
+                                        <td class="py-3.5 px-4 text-app font-medium truncate max-w-[160px]">client-backup.tar.gz</td>
+                                        <td class="py-3.5 px-4 w-32">
+                                            <div class="flex justify-between text-[10px] mb-1 font-mono">
+                                                <span>64%</span>
+                                            </div>
+                                            <div class="w-full h-1.5 rounded-full bg-surface2 overflow-hidden">
+                                                <div class="h-full bg-amber-500 rounded-full progress-fill" style="width: 64%"></div>
+                                            </div>
+                                        </td>
+                                        <td class="py-3.5 px-4 font-mono text-app2">118 MB/s</td>
+                                        <td class="py-3.5 px-4 font-mono text-app2">45 sec</td>
+                                        <td class="py-3.5 px-4 text-right">
+                                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-amber-500 bg-amber-500/10">Syncing</span>
+                                        </td>
+                                    </tr>
+                                    <tr class="border-b border-app hover:bg-surface2/60 transition-colors">
+                                        <td class="py-3.5 px-4 font-mono font-semibold text-cyan-500">Node 5000</td>
+                                        <td class="py-3.5 px-4 font-medium">Verifying Checksums</td>
+                                        <td class="py-3.5 px-4 text-app font-medium truncate max-w-[160px]">ml-model-weights.bin</td>
+                                        <td class="py-3.5 px-4 w-32">
+                                            <div class="flex justify-between text-[10px] mb-1 font-mono">
+                                                <span>94%</span>
+                                            </div>
+                                            <div class="w-full h-1.5 rounded-full bg-surface2 overflow-hidden">
+                                                <div class="h-full bg-cyan-500 rounded-full progress-fill" style="width: 94%"></div>
+                                            </div>
+                                        </td>
+                                        <td class="py-3.5 px-4 font-mono text-app2">210 MB/s</td>
+                                        <td class="py-3.5 px-4 font-mono text-app2">4 sec</td>
+                                        <td class="py-3.5 px-4 text-right">
+                                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-emerald-500 bg-emerald-500/10">Verifying</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- LIVE EVENTS TIMELINE -->
+                    <div class="card p-5 fade-in" style="animation-delay:660ms">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <span class="status-dot bg-brand-500 pulse-dot"></span>
+                                <h3 class="font-bold text-sm">Live Cluster Events Timeline</h3>
+                            </div>
+                            <span class="text-[11px] font-medium text-brand-500 bg-brand-500/10 px-2 py-0.5 rounded-full">Real-time Log</span>
+                        </div>
+
+                        <div id="liveEventsTimeline" class="space-y-4 text-xs">
+                            <!-- Streamed live timeline items injected via JS -->
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- RIGHT SIDEBAR PANEL (1 Col wide) -->
+                <div class="space-y-6">
+
+                    <!-- STORAGE DISTRIBUTION DONUT CHART -->
+                    <div class="card p-5 fade-in" style="animation-delay:600ms">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="pie-chart" class="w-4 h-4 text-brand-500"></i>
+                                <h3 class="font-bold text-sm">Node Storage Allocation</h3>
+                            </div>
+                            <span class="text-[11px] text-app2">7.3 TB Total</span>
+                        </div>
+
+                        <div class="h-[200px] relative flex items-center justify-center">
+                            <canvas id="nodesDonutChart"></canvas>
+                        </div>
+
+                        <div class="mt-4 grid grid-cols-3 gap-2 pt-3 border-t border-app text-center text-xs">
+                            <div class="p-2 rounded-xl bg-surface2/60">
+                                <span class="text-[10px] font-semibold block text-brand-500">Node 3000</span>
+                                <span class="font-bold">4.2 TB</span>
+                            </div>
+                            <div class="p-2 rounded-xl bg-surface2/60">
+                                <span class="text-[10px] font-semibold block text-amber-500">Node 4000</span>
+                                <span class="font-bold">2.1 TB</span>
+                            </div>
+                            <div class="p-2 rounded-xl bg-surface2/60">
+                                <span class="text-[10px] font-semibold block text-cyan-500">Node 5000</span>
+                                <span class="font-bold">1.0 TB</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CLUSTER SUMMARY CARD -->
+                    <div class="card p-5 fade-in" style="animation-delay:660ms">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="globe" class="w-4 h-4 text-brand-500"></i>
+                                <h3 class="font-bold text-sm">Cluster Summary</h3>
+                            </div>
+                            <span class="text-[11px] text-emerald-500 font-semibold">Active</span>
+                        </div>
+
+                        <div class="space-y-3 text-xs">
+                            <div class="flex justify-between items-center p-2 rounded-xl bg-surface2/60">
+                                <span class="text-app2">Current Leader</span>
+                                <span class="font-semibold text-brand-500">Node 3000 (Raft)</span>
+                            </div>
+                            <div class="flex justify-between items-center p-2 rounded-xl bg-surface2/60">
+                                <span class="text-app2">Storage Remaining</span>
+                                <span class="font-semibold">4.7 TB (39%)</span>
+                            </div>
+                            <div class="flex justify-between items-center p-2 rounded-xl bg-surface2/60">
+                                <span class="text-app2">Replication Queue</span>
+                                <span class="font-semibold text-emerald-500">0 Pending</span>
+                            </div>
+                            <div class="flex justify-between items-center p-2 rounded-xl bg-surface2/60">
+                                <span class="text-app2">Active Transfers</span>
+                                <span class="font-semibold">3 Pipelines</span>
+                            </div>
+                            <div class="flex justify-between items-center p-2 rounded-xl bg-surface2/60">
+                                <span class="text-app2">Cluster Version</span>
+                                <span class="font-mono text-app2">v1.0.4 Enterprise</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- FOOTER -->
+            <footer class="text-center text-[11px] text-app2 pt-10 pb-4">
+                NazeerDFS Enterprise · Node Cluster Observability Console · Raft Distributed Consensus Protocol
+            </footer>
+
+        </main>
+    </div>
+
+    <!-- ADD NODE MODAL -->
+    <div id="addNodeModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="card w-full max-w-md p-6 relative fade-in">
+            <button class="closeModalBtn absolute top-4 right-4 p-1 rounded-lg hover:bg-surface2 text-app2">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center text-brand-500">
+                    <i data-lucide="server" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-base">Add Storage Node to Cluster</h3>
+                    <p class="text-xs text-app2">Register new server into distributed mesh.</p>
+                </div>
+            </div>
+
+            <div class="space-y-3 mb-4 text-xs">
+                <div>
+                    <label class="block font-semibold text-app2 mb-1">Node IP & Port Address</label>
+                    <input type="text" id="newNodeIp" placeholder="e.g. 192.168.1.103:6000" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-mono">
+                </div>
+                <div>
+                    <label class="block font-semibold text-app2 mb-1">Allocated Storage Capacity (TB)</label>
+                    <input type="number" id="newNodeCapacity" placeholder="e.g. 4" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-mono">
+                </div>
+                <div>
+                    <label class="block font-semibold text-app2 mb-1">Region / Rack Zone</label>
+                    <select class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none">
+                        <option>us-east-1a (Primary Data Center)</option>
+                        <option>us-east-1b (Backup Region)</option>
+                        <option>eu-central-1 (Edge Storage)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button class="closeModalBtn px-4 py-2.5 rounded-xl border border-app text-xs font-medium hover:bg-surface2">Cancel</button>
+                <button id="confirmAddNodeBtn" class="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow-lg shadow-brand-500/25">Connect Node</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        lucide.createIcons();
+
+        /* ---------------- THEME INITIALIZATION ---------------- */
+        const root = document.documentElement;
+        const themeToggle = document.getElementById('themeToggle');
+        const toggleThumb = document.getElementById('toggleThumb');
+        const toggleIconEl = document.getElementById('toggleIcon');
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                root.classList.add('dark');
+                toggleThumb.style.transform = 'translateX(24px)';
+                toggleIconEl.setAttribute('data-lucide', 'moon');
+            } else {
+                root.classList.remove('dark');
+                toggleThumb.style.transform = 'translateX(0px)';
+                toggleIconEl.setAttribute('data-lucide', 'sun');
+            }
+            lucide.createIcons();
+        }
+
+        const savedTheme = localStorage.getItem('nazeerdfs-theme') ||
+            (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        applyTheme(savedTheme);
+
+        themeToggle.addEventListener('click', () => {
+            const next = root.classList.contains('dark') ? 'light' : 'dark';
+            localStorage.setItem('nazeerdfs-theme', next);
+            applyTheme(next);
+            updateChartColors();
+        });
+
+        /* ---------------- MOBILE SIDEBAR ---------------- */
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        document.getElementById('menuBtn').addEventListener('click', () => {
+            sidebar.classList.add('open');
+            overlay.classList.remove('hidden');
+        });
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay.classList.add('hidden');
+        });
+
+        /* ---------------- PROFILE DROPDOWN ---------------- */
+        const profileBtn = document.getElementById('profileBtn');
+        const profileDropdown = document.getElementById('profileDropdown');
+        profileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            profileDropdown.classList.toggle('hidden');
+        });
+        document.addEventListener('click', () => profileDropdown.classList.add('hidden'));
+
+        /* ---------------- RIPPLE EFFECT ---------------- */
+        document.querySelectorAll('.ripple').forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                const rect = this.getBoundingClientRect();
+                const circle = document.createElement('span');
+                const size = Math.max(rect.width, rect.height);
+                circle.className = 'ripple-effect';
+                circle.style.width = circle.style.height = size + 'px';
+                circle.style.left = (e.clientX - rect.left - size / 2) + 'px';
+                circle.style.top = (e.clientY - rect.top - size / 2) + 'px';
+                this.appendChild(circle);
+                setTimeout(() => circle.remove(), 600);
+            });
+        });
+
+        setTimeout(() => {
+            document.getElementById('sidebarStorageBar').style.width = '61%';
+        }, 300);
+
+        /* ---------------- TOAST NOTIFICATION ---------------- */
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'pointer-events-auto bg-card border border-app rounded-xl p-3.5 shadow-xl flex items-center gap-3 text-xs fade-in min-w-[260px] max-w-sm';
+            
+            const iconMap = {
+                info: '<i data-lucide="info" class="w-4 h-4 text-brand-500"></i>',
+                success: '<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i>',
+                warning: '<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>'
+            };
+
+            toast.innerHTML = `
+                <div class="flex-shrink-0">${iconMap[type] || iconMap.info}</div>
+                <div class="flex-1 font-medium text-app">${message}</div>
+            `;
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                toast.style.transition = 'all 300ms ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        /* ---------------- DEMO NODE BUTTONS ---------------- */
+        function pingNode(nodeName) {
+            showToast(`Pinged <strong>${nodeName}</strong> — 0.4ms RTT (0% packet loss)`, 'success');
+        }
+
+        function restartNode(nodeName) {
+            showToast(`Initiating soft restart sequence for <strong>${nodeName}</strong>…`, 'warning');
+        }
+
+        function healthReport(nodeName) {
+            showToast(`Generated diagnostic health report for <strong>${nodeName}</strong>. All checks passed.`, 'info');
+        }
+
+        /* ---------------- ADD NODE MODAL ---------------- */
+        const addNodeModal = document.getElementById('addNodeModal');
+        document.getElementById('addNodeBtn').addEventListener('click', () => {
+            addNodeModal.classList.remove('hidden');
+        });
+
+        document.querySelectorAll('.closeModalBtn').forEach(btn => {
+            btn.addEventListener('click', () => addNodeModal.classList.add('hidden'));
+        });
+
+        document.getElementById('confirmAddNodeBtn').addEventListener('click', () => {
+            const ip = document.getElementById('newNodeIp').value.trim();
+            if (ip) {
+                showToast(`Node <strong>${ip}</strong> registered and joining cluster mesh!`, 'success');
+                document.getElementById('newNodeIp').value = '';
+            }
+            addNodeModal.classList.add('hidden');
+        });
+
+        /* ---------------- REFRESH BUTTON ---------------- */
+        document.getElementById('refreshClusterBtn').addEventListener('click', () => {
+            const icon = document.getElementById('refreshIcon');
+            icon.style.transition = 'transform 700ms ease';
+            icon.style.transform = 'rotate(360deg)';
+            setTimeout(() => { icon.style.transform = 'rotate(0deg)'; }, 700);
+            showToast('Refreshed real-time storage node telemetry.', 'info');
+        });
+
+        /* ---------------- DYNAMIC METRICS SIMULATION ---------------- */
+        setInterval(() => {
+            // Fluctuate Node 3000
+            const cpu3 = Math.round(30 + Math.random() * 12);
+            const ram3 = Math.round(55 + Math.random() * 8);
+            document.getElementById('n3000CpuVal').textContent = `${cpu3}%`;
+            document.getElementById('n3000CpuBar').style.width = `${cpu3}%`;
+            document.getElementById('n3000RamVal').textContent = `${ram3}%`;
+            document.getElementById('n3000RamBar').style.width = `${ram3}%`;
+            document.getElementById('node3000Temp').textContent = Math.round(41 + Math.random() * 3);
+
+            // Fluctuate Node 4000
+            const cpu4 = Math.round(42 + Math.random() * 15);
+            const ram4 = Math.round(60 + Math.random() * 6);
+            document.getElementById('n4000CpuVal').textContent = `${cpu4}%`;
+            document.getElementById('n4000CpuBar').style.width = `${cpu4}%`;
+            document.getElementById('n4000RamVal').textContent = `${ram4}%`;
+            document.getElementById('n4000RamBar').style.width = `${ram4}%`;
+            document.getElementById('node4000Temp').textContent = Math.round(44 + Math.random() * 3);
+
+            // Fluctuate Node 5000
+            const cpu5 = Math.round(20 + Math.random() * 10);
+            const ram5 = Math.round(38 + Math.random() * 8);
+            document.getElementById('n5000CpuVal').textContent = `${cpu5}%`;
+            document.getElementById('n5000CpuBar').style.width = `${cpu5}%`;
+            document.getElementById('n5000RamVal').textContent = `${ram5}%`;
+            document.getElementById('n5000RamBar').style.width = `${ram5}%`;
+            document.getElementById('node5000Temp').textContent = Math.round(38 + Math.random() * 3);
+
+            const avgLoad = Math.round((cpu3 + cpu4 + cpu5) / 3);
+            document.getElementById('avgClusterLoad').textContent = avgLoad;
+        }, 2200);
+
+        /* ---------------- LIVE EVENTS TIMELINE ---------------- */
+        const eventTemplates = [
+            { text: 'Heartbeat ACK from Node 3000 (0.3ms)', icon: 'activity', color: 'text-emerald-500' },
+            { text: 'Shard [0x9f1a] replicated to Node 4000', icon: 'copy', color: 'text-brand-500' },
+            { text: 'Compaction finished on Node 5000 (freed 4.2GB)', icon: 'hard-drive', color: 'text-cyan-500' },
+            { text: 'Raft consensus check passed (3/3 nodes in sync)', icon: 'shield-check', color: 'text-emerald-500' },
+            { text: 'Storage rebalancing completed across cluster', icon: 'pie-chart', color: 'text-amber-500' },
+            { text: 'Node 3000 re-elected Raft Leader', icon: 'award', color: 'text-brand-500' }
+        ];
+
+        const timelineEl = document.getElementById('liveEventsTimeline');
+        let evIndex = 0;
+
+        function pushClusterEvent() {
+            const ev = eventTemplates[evIndex % eventTemplates.length];
+            evIndex++;
+
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            const item = document.createElement('div');
+            item.className = 'flex items-center justify-between p-2.5 rounded-xl bg-surface2/50 border border-app hover:bg-surface2 transition-colors fade-in';
+            item.innerHTML = `
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-7 h-7 rounded-lg bg-surface2 flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="${ev.icon}" class="w-3.5 h-3.5 ${ev.color}"></i>
+                    </div>
+                    <p class="font-medium text-app truncate">${ev.text}</p>
+                </div>
+                <span class="text-[10px] font-mono text-app2 flex-shrink-0 ml-2">${timeStr}</span>
+            `;
+
+            timelineEl.prepend(item);
+            lucide.createIcons();
+
+            while (timelineEl.children.length > 5) {
+                timelineEl.removeChild(timelineEl.lastChild);
+            }
+        }
+
+        for (let i = 0; i < 4; i++) pushClusterEvent();
+        setInterval(pushClusterEvent, 4000);
+
+        /* ---------------- STORAGE DONUT CHART ---------------- */
+        let donutChart = null;
+        function updateChartColors() {
+            if (!donutChart) return;
+            const isDark = root.classList.contains('dark');
+            donutChart.options.plugins.legend.labels.color = isDark ? '#F8FAFC' : '#0F172A';
+            donutChart.update();
+        }
+
+        function initDonutChart() {
+            const ctx = document.getElementById('nodesDonutChart').getContext('2d');
+            const isDark = root.classList.contains('dark');
+
+            donutChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Node 3000', 'Node 4000', 'Node 5000'],
+                    datasets: [{
+                        data: [4.2, 2.1, 1.0],
+                        backgroundColor: ['#F97316', '#F59E0B', '#06B6D4'],
+                        borderWidth: 0,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '72%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                            titleColor: isDark ? '#F8FAFC' : '#0F172A',
+                            bodyColor: isDark ? '#CBD5E1' : '#475569',
+                            borderColor: isDark ? '#475569' : '#CBD5E1',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: true,
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.label}: ${context.raw} TB Storage`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        initDonutChart();
+    </script>
+</body>
+
+</html>

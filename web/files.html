@@ -1,0 +1,1806 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Files — NazeerDFS Enterprise</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            DEFAULT: '#F97316',
+                            50: '#FFF7ED', 100: '#FFEDD5', 200: '#FED7AA', 300: '#FDBA74',
+                            400: '#FB923C', 500: '#F97316', 600: '#EA580C', 700: '#C2410C',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg: #F8FAFC;
+            --sidebar: #FFFFFF;
+            --card: #FFFFFF;
+            --surface2: #F1F5F9;
+            --border: #CBD5E1;
+            --text: #0F172A;
+            --text2: #475569;
+            --shadow-color: 15, 23, 42;
+        }
+
+        html.dark {
+            --bg: #0F172A;
+            --sidebar: #111827;
+            --card: #1E293B;
+            --surface2: #334155;
+            --border: #475569;
+            --text: #F8FAFC;
+            --text2: #CBD5E1;
+            --shadow-color: 0, 0, 0;
+        }
+
+        * {
+            transition: background-color 380ms ease, border-color 380ms ease, color 380ms ease, box-shadow 380ms ease;
+        }
+
+        html,
+        body {
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .bg-app {
+            background: var(--bg);
+        }
+
+        .bg-sidebar {
+            background: var(--sidebar);
+        }
+
+        .bg-card {
+            background: var(--card);
+        }
+
+        .bg-surface2 {
+            background: var(--surface2);
+        }
+
+        .border-app {
+            border-color: var(--border);
+        }
+
+        .text-app {
+            color: var(--text);
+        }
+
+        .text-app2 {
+            color: var(--text2);
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow: 0 1px 2px rgba(var(--shadow-color), 0.04), 0 8px 24px -12px rgba(var(--shadow-color), 0.12);
+            transition: transform 240ms cubic-bezier(.2, .8, .2, 1), box-shadow 240ms ease, background-color 380ms ease, border-color 380ms ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 12px rgba(var(--shadow-color), 0.06), 0 16px 40px -14px rgba(var(--shadow-color), 0.18);
+            transform: translateY(-2px);
+        }
+
+        .glass {
+            backdrop-filter: blur(20px) saturate(160%);
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            background: color-mix(in srgb, var(--card) 72%, transparent);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 8px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #F97316;
+        }
+
+        .nav-item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            color: var(--text2);
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 200ms ease;
+        }
+
+        .nav-item:hover {
+            background: var(--surface2);
+            color: var(--text);
+            transform: translateX(2px);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.14), rgba(249, 115, 22, 0.06));
+            color: #F97316;
+        }
+
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: -14px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 22px;
+            background: #F97316;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .nav-item i {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeInUp 560ms cubic-bezier(.2, .8, .2, 1) both;
+        }
+
+        @keyframes pulseDot {
+            0% {
+                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.55);
+            }
+
+            70% {
+                box-shadow: 0 0 0 8px rgba(249, 115, 22, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+            }
+        }
+
+        .pulse-dot {
+            animation: pulseDot 2s infinite;
+        }
+
+        @keyframes shimmerBar {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        .bar-shimmer::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+            animation: shimmerBar 1.6s infinite;
+        }
+
+        .ripple {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ripple-effect {
+            position: absolute;
+            border-radius: 50%;
+            transform: scale(0);
+            background: rgba(255, 255, 255, 0.5);
+            animation: rippleAnim 600ms ease-out;
+            pointer-events: none;
+        }
+
+        @keyframes rippleAnim {
+            to {
+                transform: scale(3);
+                opacity: 0;
+            }
+        }
+
+        .progress-fill {
+            transition: width 900ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        #sidebar {
+            transition: transform 320ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .toggle-track {
+            transition: background-color 380ms ease;
+        }
+
+        .toggle-thumb {
+            transition: transform 380ms cubic-bezier(.2, .8, .2, 1);
+        }
+
+        @media (max-width: 1024px) {
+            #sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+                z-index: 40;
+                height: 100vh;
+            }
+
+            #sidebar.open {
+                transform: translateX(0);
+            }
+        }
+
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        input:focus,
+        button:focus-visible,
+        select:focus,
+        a:focus-visible {
+            outline: 2px solid #F97316;
+            outline-offset: 2px;
+        }
+
+        /* Slide-over panel animation */
+        #detailsPanel {
+            transition: transform 340ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #detailsPanel.translate-x-full {
+            transform: translateX(100%);
+        }
+
+        .table-row-selected {
+            background-color: rgba(249, 115, 22, 0.08) !important;
+            border-left: 3px solid #F97316;
+        }
+
+        /* Custom Category Pill Active */
+        .category-pill.active {
+            background-color: #F97316;
+            color: #FFFFFF;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+        }
+    </style>
+</head>
+
+<body class="bg-app text-app font-sans antialiased min-h-screen">
+
+    <div id="overlay" class="fixed inset-0 bg-black/40 z-30 hidden lg:hidden"></div>
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="w-[280px] bg-sidebar border-r border-app fixed top-0 left-0 h-screen flex flex-col z-40">
+        <div class="h-[72px] flex items-center gap-3 px-6 border-b border-app flex-shrink-0">
+            <div
+                class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
+                <i data-lucide="hexagon" class="w-5 h-5 text-white"></i>
+            </div>
+            <div class="leading-tight">
+                <p class="font-bold text-[15px] tracking-tight">NazeerDFS</p>
+                <p class="text-[11px] text-app2">Enterprise Distributed Storage</p>
+            </div>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto px-4 py-5 space-y-1 scrollbar-thin">
+            <p class="px-3 text-[11px] font-semibold uppercase tracking-wider text-app2 mb-2">Workspace</p>
+            <a href="dashboard.html" class="nav-item" data-page="dashboard"><i
+                    data-lucide="layout-dashboard"></i>Dashboard</a>
+            <a href="files.html" class="nav-item active" data-page="files"><i data-lucide="folder"></i>My Files</a>
+            <a href="upload.html" class="nav-item" data-page="upload"><i data-lucide="upload-cloud"></i>Upload Center</a>
+            <a href="nodes.html" class="nav-item" data-page="nodes"><i data-lucide="server"></i>Storage Nodes</a>
+            <a href="cluster.html" class="nav-item" data-page="cluster"><i data-lucide="globe"></i>Cluster Monitor</a>
+            <a href="settings.html" class="nav-item" data-page="settings"><i data-lucide="settings"></i>Settings</a>
+        </nav>
+
+        <div class="px-4 pb-4">
+            <div class="card !rounded-2xl p-4 mb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-app2">Storage Used</span>
+                    <span class="text-xs font-semibold text-brand-500">61%</span>
+                </div>
+                <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
+                    <div id="sidebarStorageBar"
+                        class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill"
+                        style="width:0%"></div>
+                </div>
+                <p class="text-[11px] text-app2 mt-2">7.3 TB of 12 TB used</p>
+            </div>
+            <p class="text-[11px] text-app2 text-center mb-3">Version 1.0.4</p>
+        </div>
+
+        <div class="border-t border-app p-4 flex items-center gap-3">
+            <img src="https://api.dicebear.com/7.x/notionists/svg?seed=Arjun"
+                class="w-9 h-9 rounded-full bg-surface2 flex-shrink-0" alt="User avatar">
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold truncate">Arjun Nazeer</p>
+                <p class="text-[11px] text-app2 truncate">Cluster Admin</p>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-app2 flex-shrink-0"></i>
+        </div>
+    </aside>
+
+    <!-- MAIN WRAPPER -->
+    <div class="lg:ml-[280px]">
+
+        <!-- NAVBAR -->
+        <header
+            class="h-[72px] bg-sidebar/90 glass border-b border-app fixed top-0 right-0 left-0 lg:left-[280px] z-20 flex items-center px-4 md:px-6 gap-4">
+            <button id="menuBtn" class="lg:hidden p-2 rounded-lg hover:bg-surface2">
+                <i data-lucide="menu" class="w-5 h-5"></i>
+            </button>
+
+            <div class="flex-shrink-0 hidden md:block">
+                <h1 class="text-[15px] font-semibold">My Files</h1>
+            </div>
+
+            <div class="flex-1 max-w-xl mx-auto hidden sm:block">
+                <div class="relative">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-app2"></i>
+                    <input type="text" id="globalNavSearch" placeholder="Search files across cluster…"
+                        class="w-full bg-surface2 border border-app rounded-xl pl-10 pr-4 py-2 text-sm placeholder:text-app2 focus:bg-card outline-none">
+                    <kbd
+                        class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] px-1.5 py-0.5 rounded border border-app text-app2 hidden md:block">⌘K</kbd>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 ml-auto">
+                <button id="quickUploadNavBtn"
+                    class="ripple hidden sm:flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-xl shadow-lg shadow-brand-500/25 transition-colors">
+                    <i data-lucide="upload" class="w-4 h-4"></i>
+                    <span>Upload</span>
+                </button>
+
+                <button id="themeToggle"
+                    class="relative w-[52px] h-[28px] rounded-full toggle-track bg-surface2 border border-app flex items-center px-1"
+                    aria-label="Toggle theme">
+                    <span id="toggleThumb"
+                        class="toggle-thumb w-[20px] h-[20px] rounded-full bg-white shadow flex items-center justify-center">
+                        <i data-lucide="moon" id="toggleIcon" class="w-3 h-3 text-slate-700"></i>
+                    </span>
+                </button>
+
+                <button class="relative p-2.5 rounded-xl hover:bg-surface2" aria-label="Notifications">
+                    <i data-lucide="bell" class="w-[18px] h-[18px]"></i>
+                    <span class="pulse-dot absolute top-2 right-2 w-2 h-2 bg-brand-500 rounded-full"></span>
+                </button>
+
+                <div class="relative">
+                    <button id="profileBtn" class="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-surface2">
+                        <img src="https://api.dicebear.com/7.x/notionists/svg?seed=Arjun"
+                            class="w-8 h-8 rounded-full bg-surface2" alt="Profile">
+                        <i data-lucide="chevron-down" class="w-4 h-4 text-app2 hidden md:block"></i>
+                    </button>
+                    <div id="profileDropdown" class="hidden absolute right-0 mt-2 w-52 card p-1.5 text-sm z-50">
+                        <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                                data-lucide="user" class="w-4 h-4"></i>Profile</a>
+                        <a href="settings.html" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                                data-lucide="settings" class="w-4 h-4"></i>Settings</a>
+                        <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                                data-lucide="key" class="w-4 h-4"></i>API Keys</a>
+                        <div class="h-px bg-app my-1"></div>
+                        <a href="#" id="logoutBtn"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2 text-red-500"><i
+                                data-lucide="log-out" class="w-4 h-4"></i>Sign out</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="pt-[72px] px-4 md:px-8 pb-16 max-w-[1600px] mx-auto">
+
+            <!-- PAGE HEADER -->
+            <section class="fade-in mt-6 mb-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-semibold text-brand-500 uppercase tracking-wider">Storage Explorer</span>
+                            <span class="text-app2">•</span>
+                            <span class="text-xs text-app2">Node Cluster Active</span>
+                        </div>
+                        <h2 class="text-2xl md:text-3xl font-bold tracking-tight">My Files</h2>
+                        <p class="text-app2 text-sm mt-1">Browse, organize and manage files across your distributed storage cluster.</p>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button id="openFolderModalBtn"
+                            class="ripple flex items-center gap-2 bg-surface2 hover:bg-surface2/80 text-app border border-app font-medium text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm">
+                            <i data-lucide="folder-plus" class="w-4 h-4 text-brand-500"></i>
+                            <span>Create Folder</span>
+                        </button>
+
+                        <button id="openUploadModalBtn"
+                            class="ripple flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-medium text-sm px-5 py-2.5 rounded-xl shadow-lg shadow-brand-500/25 transition-all">
+                            <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                            <span>Upload File</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- QUICK STATS CARDS -->
+            <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+                <div class="card p-5 fade-in" style="animation-delay:60ms">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center">
+                            <i data-lucide="files" class="w-5 h-5 text-brand-500"></i>
+                        </div>
+                        <span class="text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">+12% this week</span>
+                    </div>
+                    <p class="text-2xl font-bold tracking-tight"><span id="statFiles">0</span></p>
+                    <p class="text-xs text-app2 mt-1">Total Files Indexed</p>
+                </div>
+
+                <div class="card p-5 fade-in" style="animation-delay:120ms">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center">
+                            <i data-lucide="hard-drive" class="w-5 h-5 text-brand-500"></i>
+                        </div>
+                        <span class="text-[11px] font-medium text-brand-500 bg-brand-500/10 px-2 py-0.5 rounded-full">61% Quota</span>
+                    </div>
+                    <p class="text-2xl font-bold tracking-tight"><span id="statSize">0</span> TB</p>
+                    <p class="text-xs text-app2 mt-1">Total Cluster Volume</p>
+                </div>
+
+                <div class="card p-5 fade-in" style="animation-delay:180ms">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center">
+                            <i data-lucide="shield-check" class="w-5 h-5 text-brand-500"></i>
+                        </div>
+                        <span class="text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">Optimal</span>
+                    </div>
+                    <p class="text-2xl font-bold tracking-tight"><span id="statReplicated">0</span>%</p>
+                    <p class="text-xs text-app2 mt-1">Replicated File Health</p>
+                </div>
+
+                <div class="card p-5 fade-in" style="animation-delay:240ms">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center">
+                            <i data-lucide="upload-cloud" class="w-5 h-5 text-brand-500"></i>
+                        </div>
+                        <span class="text-[11px] font-medium text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-full">Active</span>
+                    </div>
+                    <p class="text-2xl font-bold tracking-tight"><span id="statUploads">0</span> Today</p>
+                    <p class="text-xs text-app2 mt-1">Recent Inbound Uploads</p>
+                </div>
+            </section>
+
+            <!-- TOP TOOLBAR & CONTROLS -->
+            <section class="card p-4 mb-6 fade-in" style="animation-delay:300ms">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    
+                    <!-- Search Input -->
+                    <div class="relative flex-1 min-w-[240px]">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-app2"></i>
+                        <input type="text" id="searchInput" placeholder="Search files..."
+                            class="w-full bg-surface2 border border-app rounded-xl pl-10 pr-4 py-2 text-sm placeholder:text-app2 focus:bg-card outline-none">
+                    </div>
+
+                    <!-- Category Pills -->
+                    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 scrollbar-thin">
+                        <button class="category-pill active text-xs font-medium px-3.5 py-2 rounded-xl border border-app bg-surface2 hover:bg-surface2/80 transition-all flex items-center gap-1.5 whitespace-nowrap" data-category="All">
+                            <i data-lucide="layers" class="w-3.5 h-3.5"></i> All Files
+                        </button>
+                        <button class="category-pill text-xs font-medium px-3.5 py-2 rounded-xl border border-app bg-surface2 hover:bg-surface2/80 text-app2 transition-all flex items-center gap-1.5 whitespace-nowrap" data-category="Documents">
+                            <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Documents
+                        </button>
+                        <button class="category-pill text-xs font-medium px-3.5 py-2 rounded-xl border border-app bg-surface2 hover:bg-surface2/80 text-app2 transition-all flex items-center gap-1.5 whitespace-nowrap" data-category="Images">
+                            <i data-lucide="image" class="w-3.5 h-3.5"></i> Images
+                        </button>
+                        <button class="category-pill text-xs font-medium px-3.5 py-2 rounded-xl border border-app bg-surface2 hover:bg-surface2/80 text-app2 transition-all flex items-center gap-1.5 whitespace-nowrap" data-category="Videos">
+                            <i data-lucide="video" class="w-3.5 h-3.5"></i> Videos
+                        </button>
+                        <button class="category-pill text-xs font-medium px-3.5 py-2 rounded-xl border border-app bg-surface2 hover:bg-surface2/80 text-app2 transition-all flex items-center gap-1.5 whitespace-nowrap" data-category="Archives">
+                            <i data-lucide="archive" class="w-3.5 h-3.5"></i> Archives
+                        </button>
+                        <button class="category-pill text-xs font-medium px-3.5 py-2 rounded-xl border border-app bg-surface2 hover:bg-surface2/80 text-app2 transition-all flex items-center gap-1.5 whitespace-nowrap" data-category="Others">
+                            <i data-lucide="more-horizontal" class="w-3.5 h-3.5"></i> Others
+                        </button>
+                    </div>
+
+                    <!-- Right Controls: Sort & Grid/List Toggle -->
+                    <div class="flex items-center gap-3 self-end lg:self-auto">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-app2 hidden sm:inline">Sort:</span>
+                            <select id="sortSelect" class="bg-surface2 border border-app rounded-xl px-3 py-2 text-xs font-medium text-app outline-none cursor-pointer">
+                                <option value="newest">Newest</option>
+                                <option value="oldest">Oldest</option>
+                                <option value="largest">Largest</option>
+                                <option value="smallest">Smallest</option>
+                                <option value="az">A - Z</option>
+                            </select>
+                        </div>
+
+                        <!-- Grid/List Toggle -->
+                        <div class="flex items-center bg-surface2 p-1 rounded-xl border border-app">
+                            <button id="listViewBtn" class="p-1.5 rounded-lg bg-card text-brand-500 shadow-sm transition-all" title="List View">
+                                <i data-lucide="list" class="w-4 h-4"></i>
+                            </button>
+                            <button id="gridViewBtn" class="p-1.5 rounded-lg text-app2 hover:text-app transition-all" title="Grid View">
+                                <i data-lucide="grid" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- MAIN CONTENT LAYOUT: FILES VIEW + SIDEBAR WIDGETS -->
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+                <!-- LEFT / CENTER COL (2 Cols wide on XL): FILES TABLE & GRID -->
+                <div class="xl:col-span-2 space-y-6">
+
+                    <!-- TABLE VIEW CONTAINER -->
+                    <div id="tableViewContainer" class="card overflow-hidden fade-in" style="animation-delay:360ms">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm border-collapse">
+                                <thead>
+                                    <tr class="border-b border-app bg-surface2/50 text-[11px] font-semibold text-app2 uppercase tracking-wider">
+                                        <th class="py-3.5 px-4 w-10 text-center">
+                                            <input type="checkbox" id="selectAllCheckbox" class="rounded border-app text-brand-500 focus:ring-0 cursor-pointer">
+                                        </th>
+                                        <th class="py-3.5 px-4">File Name</th>
+                                        <th class="py-3.5 px-4">Size</th>
+                                        <th class="py-3.5 px-4 hidden md:table-cell">Type</th>
+                                        <th class="py-3.5 px-4 hidden sm:table-cell">Owner</th>
+                                        <th class="py-3.5 px-4 hidden lg:table-cell">Node</th>
+                                        <th class="py-3.5 px-4 hidden sm:table-cell text-center">Replicas</th>
+                                        <th class="py-3.5 px-4">Status</th>
+                                        <th class="py-3.5 px-4 hidden md:table-cell">Modified</th>
+                                        <th class="py-3.5 px-4 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="fileTableBody" class="divide-y divide-app">
+                                    <!-- Dynamic rows injected here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- GRID VIEW CONTAINER (Hidden by default) -->
+                    <div id="gridViewContainer" class="hidden grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 fade-in">
+                        <!-- Dynamic grid cards injected here -->
+                    </div>
+
+                    <!-- EMPTY STATE CONTAINER (Hidden by default) -->
+                    <div id="emptyState" class="hidden card p-12 text-center fade-in">
+                        <div class="w-16 h-16 rounded-2xl bg-brand-500/10 flex items-center justify-center mx-auto mb-4 text-brand-500">
+                            <i data-lucide="folder-search" class="w-8 h-8"></i>
+                        </div>
+                        <h3 class="text-lg font-bold">No files found</h3>
+                        <p class="text-app2 text-sm mt-1 max-w-sm mx-auto">No files match your current search or filter query. Upload a new file to get started.</p>
+                        <div class="mt-6 flex justify-center gap-3">
+                            <button id="resetFilterBtn" class="px-4 py-2 rounded-xl bg-surface2 border border-app text-sm font-medium hover:bg-surface2/80">Reset Filters</button>
+                            <button onclick="document.getElementById('openUploadModalBtn').click()" class="px-4 py-2 rounded-xl bg-brand-500 text-white text-sm font-medium shadow-lg shadow-brand-500/25 flex items-center gap-2">
+                                <i data-lucide="upload" class="w-4 h-4"></i> Upload your first file
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- RIGHT COL (1 Col wide): SIDE WIDGETS -->
+                <div class="space-y-6">
+
+                    <!-- STORAGE DISTRIBUTION DONUT CHART -->
+                    <div class="card p-5 fade-in" style="animation-delay:420ms">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="pie-chart" class="w-4 h-4 text-brand-500"></i>
+                                <h3 class="font-bold text-sm">Storage Distribution</h3>
+                            </div>
+                            <span class="text-[11px] text-app2">Cluster Nodes</span>
+                        </div>
+                        <div class="h-[200px] relative flex items-center justify-center">
+                            <canvas id="storageDonutChart"></canvas>
+                        </div>
+                        <div class="mt-4 grid grid-cols-3 gap-2 pt-3 border-t border-app text-center">
+                            <div class="p-2 rounded-xl bg-surface2/60">
+                                <div class="flex items-center justify-center gap-1.5 mb-0.5">
+                                    <span class="w-2 h-2 rounded-full bg-brand-500"></span>
+                                    <span class="text-[11px] font-semibold">Node 3000</span>
+                                </div>
+                                <p class="text-xs font-bold text-app">4.2 TB</p>
+                            </div>
+                            <div class="p-2 rounded-xl bg-surface2/60">
+                                <div class="flex items-center justify-center gap-1.5 mb-0.5">
+                                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                    <span class="text-[11px] font-semibold">Node 4000</span>
+                                </div>
+                                <p class="text-xs font-bold text-app">2.1 TB</p>
+                            </div>
+                            <div class="p-2 rounded-xl bg-surface2/60">
+                                <div class="flex items-center justify-center gap-1.5 mb-0.5">
+                                    <span class="w-2 h-2 rounded-full bg-cyan-500"></span>
+                                    <span class="text-[11px] font-semibold">Node 5000</span>
+                                </div>
+                                <p class="text-xs font-bold text-app">1.0 TB</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RECENT ACTIVITY WIDGET -->
+                    <div class="card p-5 fade-in" style="animation-delay:480ms">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <span class="status-dot bg-brand-500 pulse-dot"></span>
+                                <h3 class="font-bold text-sm">Recent Activity</h3>
+                            </div>
+                            <span class="text-[11px] text-brand-500 font-medium bg-brand-500/10 px-2 py-0.5 rounded-full">Live Sync</span>
+                        </div>
+
+                        <div id="activityTimeline" class="space-y-4 text-xs">
+                            <!-- Injected dynamically with live update timer -->
+                        </div>
+                    </div>
+
+                    <!-- CURRENT UPLOAD QUEUE WIDGET -->
+                    <div class="card p-5 fade-in" style="animation-delay:540ms">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="upload-cloud" class="w-4 h-4 text-brand-500"></i>
+                                <h3 class="font-bold text-sm">Current Upload Queue</h3>
+                            </div>
+                            <span class="text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">1 Active</span>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div>
+                                <div class="flex items-center justify-between text-xs font-medium mb-1">
+                                    <span class="truncate pr-2">enterprise-architecture-2026.iso</span>
+                                    <span id="queueProgressPct" class="text-brand-500 font-bold flex-shrink-0">74%</span>
+                                </div>
+                                <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden relative mb-1.5">
+                                    <div id="queueProgressBar" class="progress-fill bar-shimmer relative h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full" style="width: 74%"></div>
+                                </div>
+                                <div class="flex items-center justify-between text-[11px] text-app2">
+                                    <span id="queueSpeed">124.5 MB/s</span>
+                                    <span id="queueEta">4s remaining</span>
+                                </div>
+                                <div class="mt-2 flex items-center gap-2 text-[11px] text-app2 bg-surface2/70 px-2.5 py-1.5 rounded-lg border border-app">
+                                    <i data-lucide="copy" class="w-3.5 h-3.5 text-brand-500"></i>
+                                    <span>Replica Creation: <strong class="text-app font-semibold">3/3 Created</strong></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- FOOTER -->
+            <footer class="text-center text-[11px] text-app2 pt-10 pb-4">
+                NazeerDFS Enterprise · Distributed File Storage Platform · Built for high-throughput fault-tolerant cluster file storage
+            </footer>
+
+        </main>
+    </div>
+
+    <!-- FILE DETAILS SLIDE-OVER PANEL -->
+    <div id="detailsPanelOverlay" class="fixed inset-0 bg-black/40 z-50 hidden transition-opacity"></div>
+    <aside id="detailsPanel" class="fixed top-0 right-0 h-screen w-full max-w-md bg-sidebar border-l border-app z-50 shadow-2xl translate-x-full flex flex-col">
+        <!-- Panel Header -->
+        <div class="h-[72px] px-6 border-b border-app flex items-center justify-between flex-shrink-0">
+            <div class="flex items-center gap-3 min-w-0">
+                <div id="panelFileIconBg" class="w-9 h-9 rounded-xl bg-brand-500/10 flex items-center justify-center flex-shrink-0">
+                    <i id="panelFileIcon" data-lucide="file-text" class="w-5 h-5 text-brand-500"></i>
+                </div>
+                <div class="min-w-0">
+                    <h3 id="panelFileName" class="font-bold text-sm truncate">filename.pdf</h3>
+                    <p id="panelFileCategory" class="text-[11px] text-app2">Document</p>
+                </div>
+            </div>
+            <button id="closeDetailsPanelBtn" class="p-2 rounded-xl hover:bg-surface2 text-app2 hover:text-app">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <!-- Panel Body -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin">
+
+            <!-- File Visual Banner -->
+            <div class="card p-6 bg-surface2/40 border border-app text-center rounded-2xl relative overflow-hidden">
+                <div class="w-16 h-16 rounded-2xl bg-brand-500/10 flex items-center justify-center mx-auto mb-3">
+                    <i id="panelBannerIcon" data-lucide="file-text" class="w-8 h-8 text-brand-500"></i>
+                </div>
+                <h4 id="panelBannerName" class="font-bold text-sm truncate px-2">filename.pdf</h4>
+                <p id="panelBannerSize" class="text-xs text-app2 mt-0.5">24.8 MB</p>
+
+                <div class="mt-4 flex items-center justify-center gap-2">
+                    <span id="panelStatusBadge" class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Healthy
+                    </span>
+                    <span id="panelEncryptionBadge" class="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500">
+                        AES-256-GCM
+                    </span>
+                </div>
+            </div>
+
+            <!-- Detailed Properties Grid -->
+            <div>
+                <h4 class="text-xs font-semibold uppercase tracking-wider text-app2 mb-3">File Properties</h4>
+                <div class="card divide-y divide-app text-xs">
+                    <div class="p-3 flex justify-between items-center">
+                        <span class="text-app2">Extension</span>
+                        <span id="propExtension" class="font-mono font-semibold">PDF</span>
+                    </div>
+                    <div class="p-3 flex justify-between items-center">
+                        <span class="text-app2">Exact File Size</span>
+                        <span id="propSize" class="font-semibold">24.8 MB</span>
+                    </div>
+                    <div class="p-3 flex justify-between items-center">
+                        <span class="text-app2">Created Date</span>
+                        <span id="propCreated" class="text-app2">2026-07-01 10:00</span>
+                    </div>
+                    <div class="p-3 flex justify-between items-center">
+                        <span class="text-app2">Last Modified</span>
+                        <span id="propModified" class="font-medium">2026-07-28 14:20</span>
+                    </div>
+                    <div class="p-3 flex justify-between items-center">
+                        <span class="text-app2">Owner</span>
+                        <span id="propOwner" class="font-semibold text-brand-500">Arjun Nazeer</span>
+                    </div>
+                    <div class="p-3 flex justify-between items-center">
+                        <span class="text-app2">Primary Node</span>
+                        <span id="propNode" class="px-2 py-0.5 rounded-lg bg-surface2 font-mono font-semibold text-app">Node 3000</span>
+                    </div>
+                    <div class="p-3 flex justify-between items-center">
+                        <span class="text-app2">Replica Count</span>
+                        <span id="propReplicas" class="font-bold text-emerald-500">3/3 Replicas</span>
+                    </div>
+                    <div class="p-3 flex justify-between items-center">
+                        <span class="text-app2">Downloads</span>
+                        <span id="propDownloads" class="font-semibold">1,420</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cluster & Security Properties -->
+            <div>
+                <h4 class="text-xs font-semibold uppercase tracking-wider text-app2 mb-3">Distributed Integrity</h4>
+                <div class="card p-4 space-y-3 text-xs">
+                    <div>
+                        <div class="flex justify-between text-app2 mb-1">
+                            <span>SHA-256 Checksum</span>
+                            <button id="copyChecksumBtn" class="text-brand-500 hover:underline">Copy</button>
+                        </div>
+                        <p id="propChecksum" class="font-mono text-[11px] bg-surface2 p-2 rounded-xl break-all text-app2">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</p>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-app2 mb-1">
+                            <span>Storage Location</span>
+                            <button id="copyLocationBtn" class="text-brand-500 hover:underline">Copy</button>
+                        </div>
+                        <p id="propLocation" class="font-mono text-[11px] bg-surface2 p-2 rounded-xl break-all text-app2">node-3000:/data/chunks/ch_8f9a2</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Panel Footer Action Buttons -->
+        <div class="p-4 border-t border-app bg-sidebar flex items-center gap-2 flex-shrink-0">
+            <button id="panelPreviewBtn" class="flex-1 py-2.5 rounded-xl bg-surface2 hover:bg-surface2/80 font-medium text-xs flex items-center justify-center gap-1.5 transition-all">
+                <i data-lucide="eye" class="w-4 h-4 text-brand-500"></i> Preview
+            </button>
+            <button id="panelDownloadBtn" class="flex-1 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-brand-500/20">
+                <i data-lucide="download" class="w-4 h-4"></i> Download
+            </button>
+            <button id="panelShareBtn" class="p-2.5 rounded-xl bg-surface2 hover:bg-surface2/80 text-app2 hover:text-app transition-all" title="Share">
+                <i data-lucide="share-2" class="w-4 h-4"></i>
+            </button>
+            <button id="panelDeleteBtn" class="p-2.5 rounded-xl bg-surface2 hover:bg-red-500/10 text-app2 hover:text-red-500 transition-all" title="Delete">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </aside>
+
+    <!-- UPLOAD FILE MODAL -->
+    <div id="uploadModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="card w-full max-w-lg p-6 relative fade-in">
+            <button class="closeModalBtn absolute top-4 right-4 p-1 rounded-lg hover:bg-surface2 text-app2">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center text-brand-500">
+                    <i data-lucide="upload-cloud" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-base">Upload File to Cluster</h3>
+                    <p class="text-xs text-app2">Select a file and specify replication settings.</p>
+                </div>
+            </div>
+
+            <div id="dropZone" class="border-2 border-dashed border-app hover:border-brand-500 rounded-2xl p-8 text-center cursor-pointer transition-colors bg-surface2/30 mb-4">
+                <i data-lucide="cloud-upload" class="w-10 h-10 text-brand-500 mx-auto mb-2"></i>
+                <p class="text-sm font-semibold">Drag & drop files here or click to browse</p>
+                <p class="text-xs text-app2 mt-1">Supports files up to 50 GB per upload batch.</p>
+                <input type="file" id="fileInput" class="hidden">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs font-semibold text-app2 mb-1">Target Storage Node</label>
+                    <select id="modalNodeSelect" class="w-full bg-surface2 border border-app rounded-xl p-2.5 text-xs outline-none">
+                        <option value="Node 3000">Node 3000 (Primary)</option>
+                        <option value="Node 4000">Node 4000 (Backup)</option>
+                        <option value="Node 5000">Node 5000 (High-Speed)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-app2 mb-1">Replication Factor</label>
+                    <select class="w-full bg-surface2 border border-app rounded-xl p-2.5 text-xs outline-none">
+                        <option value="3">3x Replicas (Recommended)</option>
+                        <option value="2">2x Replicas</option>
+                        <option value="1">1x Replica (Single Node)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button class="closeModalBtn px-4 py-2.5 rounded-xl border border-app text-xs font-medium hover:bg-surface2">Cancel</button>
+                <button id="startUploadBtn" class="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow-lg shadow-brand-500/25 flex items-center gap-2">
+                    <i data-lucide="upload" class="w-4 h-4"></i> Start Upload
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CREATE FOLDER MODAL -->
+    <div id="folderModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="card w-full max-w-md p-6 relative fade-in">
+            <button class="closeModalBtn absolute top-4 right-4 p-1 rounded-lg hover:bg-surface2 text-app2">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center text-brand-500">
+                    <i data-lucide="folder-plus" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-base">Create New Folder</h3>
+                    <p class="text-xs text-app2">Organize files inside distributed namespace.</p>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-app2 mb-1">Folder Name</label>
+                <input type="text" id="folderNameInput" placeholder="e.g. project-backups-2026" class="w-full bg-surface2 border border-app rounded-xl p-2.5 text-sm outline-none">
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button class="closeModalBtn px-4 py-2.5 rounded-xl border border-app text-xs font-medium hover:bg-surface2">Cancel</button>
+                <button id="confirmCreateFolderBtn" class="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow-lg shadow-brand-500/25">Create Folder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SHARE MODAL -->
+    <div id="shareModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="card w-full max-w-md p-6 relative fade-in">
+            <button class="closeModalBtn absolute top-4 right-4 p-1 rounded-lg hover:bg-surface2 text-app2">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center text-brand-500">
+                    <i data-lucide="share-2" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-base">Share File Link</h3>
+                    <p class="text-xs text-app2">Generate secure access link for cluster file.</p>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-app2 mb-1">Encrypted Share URL</label>
+                <div class="flex gap-2">
+                    <input type="text" id="shareUrlInput" readonly value="https://nazeerdfs.io/s/8f9a2bc190" class="flex-1 bg-surface2 border border-app rounded-xl p-2.5 text-xs font-mono text-app2 outline-none">
+                    <button id="copyShareLinkBtn" class="px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-medium">Copy</button>
+                </div>
+            </div>
+
+            <div class="flex justify-end">
+                <button class="closeModalBtn px-4 py-2 rounded-xl border border-app text-xs font-medium hover:bg-surface2">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- RENAME MODAL -->
+    <div id="renameModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="card w-full max-w-md p-6 relative fade-in">
+            <button class="closeModalBtn absolute top-4 right-4 p-1 rounded-lg hover:bg-surface2 text-app2">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center text-brand-500">
+                    <i data-lucide="edit-3" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-base">Rename File</h3>
+                    <p class="text-xs text-app2">Update metadata name in storage index.</p>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-app2 mb-1">New Filename</label>
+                <input type="text" id="renameInput" class="w-full bg-surface2 border border-app rounded-xl p-2.5 text-sm outline-none">
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button class="closeModalBtn px-4 py-2.5 rounded-xl border border-app text-xs font-medium hover:bg-surface2">Cancel</button>
+                <button id="confirmRenameBtn" class="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow-lg shadow-brand-500/25">Save Name</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DELETE CONFIRMATION MODAL -->
+    <div id="deleteModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="card w-full max-w-md p-6 relative fade-in">
+            <button class="closeModalBtn absolute top-4 right-4 p-1 rounded-lg hover:bg-surface2 text-app2">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500">
+                    <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-base">Delete File Permanently</h3>
+                    <p class="text-xs text-app2">This will remove all replicas across the cluster.</p>
+                </div>
+            </div>
+
+            <p class="text-xs text-app mb-4">Are you sure you want to delete <strong id="deleteTargetFileName" class="text-brand-500">filename.pdf</strong>? This action cannot be undone.</p>
+
+            <div class="flex justify-end gap-3">
+                <button class="closeModalBtn px-4 py-2.5 rounded-xl border border-app text-xs font-medium hover:bg-surface2">Cancel</button>
+                <button id="confirmDeleteBtn" class="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-semibold shadow-lg shadow-red-500/25">Delete File</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PREVIEW MODAL -->
+    <div id="previewModal" class="fixed inset-0 bg-black/70 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="card w-full max-w-3xl p-6 relative fade-in max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between border-b border-app pb-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <i id="previewFileIcon" data-lucide="file-text" class="w-5 h-5 text-brand-500"></i>
+                    <h3 id="previewTitle" class="font-bold text-base">annual-report-2026.pdf</h3>
+                </div>
+                <button class="closeModalBtn p-1 rounded-lg hover:bg-surface2 text-app2">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 bg-surface2/60 rounded-2xl p-8 flex flex-col items-center justify-center text-center overflow-auto min-h-[300px]">
+                <div class="w-20 h-20 rounded-2xl bg-brand-500/10 flex items-center justify-center mb-4 text-brand-500">
+                    <i id="previewCenterIcon" data-lucide="file-text" class="w-10 h-10"></i>
+                </div>
+                <h4 id="previewNameSub" class="font-bold text-lg">annual-report-2026.pdf</h4>
+                <p class="text-xs text-app2 mt-1">Enterprise Encryption Verified · SHA-256 Clean</p>
+                <div class="mt-6 flex items-center gap-3">
+                    <button id="previewDownloadActionBtn" class="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold flex items-center gap-2">
+                        <i data-lucide="download" class="w-4 h-4"></i> Download Full File
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        if (typeof checkSession === 'function') {
+            checkSession();
+        }
+
+        lucide.createIcons();
+
+        /* ---------------- THEME INITIALIZATION ---------------- */
+        const root = document.documentElement;
+        const themeToggle = document.getElementById('themeToggle');
+        const toggleThumb = document.getElementById('toggleThumb');
+        const toggleIconEl = document.getElementById('toggleIcon');
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                root.classList.add('dark');
+                toggleThumb.style.transform = 'translateX(24px)';
+                toggleIconEl.setAttribute('data-lucide', 'moon');
+            } else {
+                root.classList.remove('dark');
+                toggleThumb.style.transform = 'translateX(0px)';
+                toggleIconEl.setAttribute('data-lucide', 'sun');
+            }
+            lucide.createIcons();
+        }
+
+        const savedTheme = localStorage.getItem('nazeerdfs-theme') ||
+            (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        applyTheme(savedTheme);
+
+        themeToggle.addEventListener('click', () => {
+            const next = root.classList.contains('dark') ? 'light' : 'dark';
+            localStorage.setItem('nazeerdfs-theme', next);
+            applyTheme(next);
+            updateChartColors();
+        });
+
+        /* ---------------- MOBILE SIDEBAR ---------------- */
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        document.getElementById('menuBtn').addEventListener('click', () => {
+            sidebar.classList.add('open');
+            overlay.classList.remove('hidden');
+        });
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay.classList.add('hidden');
+        });
+
+        /* ---------------- PROFILE DROPDOWN ---------------- */
+        const profileBtn = document.getElementById('profileBtn');
+        const profileDropdown = document.getElementById('profileDropdown');
+        profileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            profileDropdown.classList.toggle('hidden');
+        });
+        document.addEventListener('click', () => profileDropdown.classList.add('hidden'));
+
+        /* ---------------- RIPPLE EFFECT ---------------- */
+        document.querySelectorAll('.ripple').forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                const rect = this.getBoundingClientRect();
+                const circle = document.createElement('span');
+                const size = Math.max(rect.width, rect.height);
+                circle.className = 'ripple-effect';
+                circle.style.width = circle.style.height = size + 'px';
+                circle.style.left = (e.clientX - rect.left - size / 2) + 'px';
+                circle.style.top = (e.clientY - rect.top - size / 2) + 'px';
+                this.appendChild(circle);
+                setTimeout(() => circle.remove(), 600);
+            });
+        });
+
+        /* ---------------- NUMBER COUNTERS ---------------- */
+        function animateCounter(el, target, opts = {}) {
+            if (!el) return;
+            const { decimals = 0, duration = 1400, suffix = '' } = opts;
+            const start = 0;
+            const startTime = performance.now();
+            function tick(now) {
+                const progress = Math.min((now - startTime) / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const value = start + (target - start) * eased;
+                el.textContent = value.toFixed(decimals) + suffix;
+                if (progress < 1) requestAnimationFrame(tick);
+            }
+            requestAnimationFrame(tick);
+        }
+
+        animateCounter(document.getElementById('statFiles'), 1294, { decimals: 0 });
+        animateCounter(document.getElementById('statSize'), 7.3, { decimals: 1 });
+        animateCounter(document.getElementById('statReplicated'), 99.98, { decimals: 2 });
+        animateCounter(document.getElementById('statUploads'), 128, { decimals: 0 });
+
+        setTimeout(() => {
+            document.getElementById('sidebarStorageBar').style.width = '61%';
+        }, 300);
+
+        /* ---------------- TOAST NOTIFICATION ---------------- */
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'pointer-events-auto bg-card border border-app rounded-xl p-3.5 shadow-xl flex items-center gap-3 text-xs fade-in min-w-[260px] max-w-sm';
+            
+            const iconMap = {
+                info: '<i data-lucide="info" class="w-4 h-4 text-brand-500"></i>',
+                success: '<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i>',
+                warning: '<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>'
+            };
+
+            toast.innerHTML = `
+                <div class="flex-shrink-0">${iconMap[type] || iconMap.info}</div>
+                <div class="flex-1 font-medium text-app">${message}</div>
+            `;
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                toast.style.transition = 'all 300ms ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        /* ---------------- REALISTIC ENTERPRISE FILES DATA ---------------- */
+        let filesData = [
+            { id: 1, name: 'annual-report-2026.pdf', size: '24.8 MB', rawSize: 25999000, category: 'Documents', owner: 'Arjun Nazeer', node: 'Node 3000', nodeColor: 'text-brand-500 bg-brand-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-28 14:20', icon: 'file-text', iconColor: 'text-red-500', checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', encryption: 'AES-256-GCM', downloads: '1,420', location: 'node-3000:/data/chunks/ch_8f9a2' },
+            { id: 2, name: 'client-backup.tar.gz', size: '14.2 GB', rawSize: 15247000000, category: 'Archives', owner: 'DevOps Team', node: 'Node 4000', nodeColor: 'text-amber-500 bg-amber-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-28 11:45', icon: 'archive', iconColor: 'text-amber-500', checksum: '8f4a2190b2e3158c67a3f1295914197365287f1a', encryption: 'AES-256-GCM', downloads: '384', location: 'node-4000:/data/backups/bk_491a' },
+            { id: 3, name: 'holiday-photos.zip', size: '1.2 GB', rawSize: 1288000000, category: 'Archives', owner: 'Sarah Connor', node: 'Node 5000', nodeColor: 'text-cyan-500 bg-cyan-500/10', replicas: '2/3', status: 'Replicating', modified: '2026-07-27 18:30', icon: 'file-archive', iconColor: 'text-brand-500', checksum: 'c4a91b290184a7e930129fbc8129731', encryption: 'AES-256-GCM', downloads: '52', location: 'node-5000:/data/media/ph_102' },
+            { id: 4, name: 'financial-data.xlsx', size: '8.4 MB', rawSize: 8808000, category: 'Documents', owner: 'Finance Lead', node: 'Node 3000', nodeColor: 'text-brand-500 bg-brand-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-27 09:15', icon: 'file-spreadsheet', iconColor: 'text-emerald-500', checksum: '7190abc12019485bc920412895710', encryption: 'AES-256-GCM', downloads: '890', location: 'node-3000:/data/finance/fn_2026' },
+            { id: 5, name: 'cluster-log-28-july.txt', size: '512 KB', rawSize: 524288, category: 'Others', owner: 'System Automated', node: 'Node 4000', nodeColor: 'text-amber-500 bg-amber-500/10', replicas: '3/3', status: 'Syncing', modified: '2026-07-28 20:05', icon: 'file-code', iconColor: 'text-blue-500', checksum: '3f90129a1b2c4d5e6f7a8b9c0d1e2f3a', encryption: 'AES-256-GCM', downloads: '2,150', location: 'node-4000:/var/log/cluster_28Jul' },
+            { id: 6, name: 'presentation.pptx', size: '45.1 MB', rawSize: 47290000, category: 'Documents', owner: 'Product Manager', node: 'Node 3000', nodeColor: 'text-brand-500 bg-brand-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-26 16:40', icon: 'presentation', iconColor: 'text-orange-500', checksum: '9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d', encryption: 'AES-256-GCM', downloads: '67', location: 'node-3000:/data/decks/deck_v4' },
+            { id: 7, name: 'promo-video-4k.mp4', size: '3.8 GB', rawSize: 4080000000, category: 'Videos', owner: 'Marketing Team', node: 'Node 5000', nodeColor: 'text-cyan-500 bg-cyan-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-25 12:10', icon: 'video', iconColor: 'text-purple-500', checksum: '11223344556677889900aabbccddeeff', encryption: 'AES-256-GCM', downloads: '310', location: 'node-5000:/data/videos/promo_4k' },
+            { id: 8, name: 'kernel-build-v5.iso', size: '4.7 GB', rawSize: 5046000000, category: 'Others', owner: 'Linux Kernel Team', node: 'Node 4000', nodeColor: 'text-amber-500 bg-amber-500/10', replicas: '1/3', status: 'Warning', modified: '2026-07-24 17:00', icon: 'disc', iconColor: 'text-slate-400', checksum: 'aabbccdd112233445566778899001122', encryption: 'AES-256-GCM', downloads: '145', location: 'node-4000:/data/iso/kernel_v5' },
+            { id: 9, name: 'customer-db-dump.sql', size: '640 MB', rawSize: 671088640, category: 'Documents', owner: 'DB Admin', node: 'Node 3000', nodeColor: 'text-brand-500 bg-brand-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-28 08:30', icon: 'database', iconColor: 'text-indigo-500', checksum: 'ffeeddccbbaa99887766554433221100', encryption: 'AES-256-GCM', downloads: '93', location: 'node-3000:/data/db/prod_dump_jul' },
+            { id: 10, name: 'hero-banner-hd.png', size: '18.4 MB', rawSize: 19293798, category: 'Images', owner: 'Design Lead', node: 'Node 5000', nodeColor: 'text-cyan-500 bg-cyan-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-28 13:00', icon: 'image', iconColor: 'text-pink-500', checksum: '1234567890abcdef1234567890abcdef', encryption: 'AES-256-GCM', downloads: '540', location: 'node-5000:/data/design/banner_hd' },
+            { id: 11, name: 'system-config.yaml', size: '12 KB', rawSize: 12288, category: 'Others', owner: 'DevOps Lead', node: 'Node 4000', nodeColor: 'text-amber-500 bg-amber-500/10', replicas: '0/3', status: 'Offline', modified: '2026-07-23 10:20', icon: 'file-cog', iconColor: 'text-rose-500', checksum: 'f1e2d3c4b5a697887766554433221100', encryption: 'AES-256-GCM', downloads: '12', location: 'node-4000:/etc/nazeerdfs/config' },
+            { id: 12, name: 'ml-model-weights.bin', size: '8.9 GB', rawSize: 9556000000, category: 'Others', owner: 'AI Research', node: 'Node 3000', nodeColor: 'text-brand-500 bg-brand-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-28 03:15', icon: 'brain-circuit', iconColor: 'text-teal-500', checksum: '00112233445566778899aabbccddeeff', encryption: 'AES-256-GCM', downloads: '410', location: 'node-3000:/data/models/weights_v9' },
+        ];
+
+        let selectedCategory = 'All';
+        let currentSearchQuery = '';
+        let currentSortMode = 'newest';
+        let selectedFileId = null;
+        let activeViewMode = 'list'; // 'list' or 'grid'
+
+        const statusBadgeMap = {
+            Healthy: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
+            Replicating: 'text-brand-500 bg-brand-500/10 border-brand-500/20',
+            Syncing: 'text-blue-500 bg-blue-500/10 border-blue-500/20',
+            Warning: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
+            Offline: 'text-red-500 bg-red-500/10 border-red-500/20'
+        };
+
+        const statusDotMap = {
+            Healthy: 'bg-emerald-500',
+            Replicating: 'bg-brand-500 pulse-dot',
+            Syncing: 'bg-blue-500',
+            Warning: 'bg-amber-500',
+            Offline: 'bg-red-500'
+        };
+
+        /* ---------------- FILTER & SORT RENDER LOGIC ---------------- */
+        function getFilteredFiles() {
+            return filesData.filter(file => {
+                const matchesCat = (selectedCategory === 'All') || (file.category === selectedCategory);
+                const matchesSearch = file.name.toLowerCase().includes(currentSearchQuery.toLowerCase()) ||
+                    file.owner.toLowerCase().includes(currentSearchQuery.toLowerCase()) ||
+                    file.node.toLowerCase().includes(currentSearchQuery.toLowerCase());
+                return matchesCat && matchesSearch;
+            }).sort((a, b) => {
+                if (currentSortMode === 'newest') return new Date(b.modified) - new Date(a.modified);
+                if (currentSortMode === 'oldest') return new Date(a.modified) - new Date(b.modified);
+                if (currentSortMode === 'largest') return b.rawSize - a.rawSize;
+                if (currentSortMode === 'smallest') return a.rawSize - b.rawSize;
+                if (currentSortMode === 'az') return a.name.localeCompare(b.name);
+                return 0;
+            });
+        }
+
+        function renderFiles() {
+            const items = getFilteredFiles();
+            const tableBody = document.getElementById('fileTableBody');
+            const gridContainer = document.getElementById('gridViewContainer');
+            const emptyState = document.getElementById('emptyState');
+            const tableContainer = document.getElementById('tableViewContainer');
+
+            if (items.length === 0) {
+                tableContainer.classList.add('hidden');
+                gridContainer.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+                if (activeViewMode === 'list') {
+                    tableContainer.classList.remove('hidden');
+                    gridContainer.classList.add('hidden');
+                } else {
+                    tableContainer.classList.add('hidden');
+                    gridContainer.classList.remove('hidden');
+                }
+            }
+
+            // Render Table Rows
+            tableBody.innerHTML = '';
+            items.forEach((file, idx) => {
+                const tr = document.createElement('tr');
+                const isSelected = selectedFileId === file.id;
+                tr.className = `border-b border-app hover:bg-surface2/60 cursor-pointer transition-colors ${isSelected ? 'table-row-selected' : ''}`;
+                tr.onclick = (e) => {
+                    if (e.target.tagName === 'INPUT' || e.target.closest('.row-action-btn')) return;
+                    openDetailsPanel(file.id);
+                };
+
+                tr.innerHTML = `
+                    <td class="py-3.5 px-4 text-center">
+                        <input type="checkbox" class="file-checkbox rounded border-app text-brand-500 focus:ring-0 cursor-pointer">
+                    </td>
+                    <td class="py-3.5 px-4">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-8 h-8 rounded-lg bg-surface2 flex items-center justify-center flex-shrink-0">
+                                <i data-lucide="${file.icon}" class="w-4 h-4 ${file.iconColor}"></i>
+                            </div>
+                            <span class="font-medium text-app truncate max-w-[200px] md:max-w-[280px]" title="${file.name}">${file.name}</span>
+                        </div>
+                    </td>
+                    <td class="py-3.5 px-4 font-mono text-xs text-app2">${file.size}</td>
+                    <td class="py-3.5 px-4 hidden md:table-cell text-xs text-app2">${file.category}</td>
+                    <td class="py-3.5 px-4 hidden sm:table-cell text-xs font-medium">${file.owner}</td>
+                    <td class="py-3.5 px-4 hidden lg:table-cell">
+                        <span class="px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold ${file.nodeColor}">${file.node}</span>
+                    </td>
+                    <td class="py-3.5 px-4 hidden sm:table-cell text-center">
+                        <span class="text-xs font-semibold font-mono text-app">${file.replicas}</span>
+                    </td>
+                    <td class="py-3.5 px-4">
+                        <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${statusBadgeMap[file.status]}">
+                            <span class="status-dot ${statusDotMap[file.status]}"></span>
+                            ${file.status}
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-4 hidden md:table-cell text-xs text-app2 whitespace-nowrap">${file.modified}</td>
+                    <td class="py-3.5 px-4 text-right">
+                        <div class="flex items-center justify-end gap-1">
+                            <button onclick="handleQuickDownload(event, ${file.id})" class="row-action-btn p-1.5 rounded-lg hover:bg-surface2 text-app2 hover:text-brand-500 transition-colors" title="Download">
+                                <i data-lucide="download" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="handleQuickShare(event, ${file.id})" class="row-action-btn p-1.5 rounded-lg hover:bg-surface2 text-app2 hover:text-brand-500 transition-colors" title="Share">
+                                <i data-lucide="share-2" class="w-4 h-4"></i>
+                            </button>
+                            <div class="relative inline-block text-left">
+                                <button onclick="toggleRowMenu(event, ${file.id})" class="row-action-btn p-1.5 rounded-lg hover:bg-surface2 text-app2 hover:text-app transition-colors" title="More Actions">
+                                    <i data-lucide="more-vertical" class="w-4 h-4"></i>
+                                </button>
+                                <div id="rowMenu-${file.id}" class="hidden absolute right-0 mt-1 w-44 card p-1 text-xs shadow-xl z-30">
+                                    <button onclick="openPreviewModal(${file.id})" class="w-full text-left px-3 py-2 rounded-lg hover:bg-surface2 flex items-center gap-2"><i data-lucide="eye" class="w-3.5 h-3.5"></i> Open Preview</button>
+                                    <button onclick="openRenameModal(${file.id})" class="w-full text-left px-3 py-2 rounded-lg hover:bg-surface2 flex items-center gap-2"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Rename</button>
+                                    <button onclick="handleMoveFile(${file.id})" class="w-full text-left px-3 py-2 rounded-lg hover:bg-surface2 flex items-center gap-2"><i data-lucide="folder-output" class="w-3.5 h-3.5"></i> Move</button>
+                                    <button onclick="handleQuickShare(event, ${file.id})" class="w-full text-left px-3 py-2 rounded-lg hover:bg-surface2 flex items-center gap-2"><i data-lucide="share-2" class="w-3.5 h-3.5"></i> Share Link</button>
+                                    <div class="h-px bg-app my-1"></div>
+                                    <button onclick="openDeleteModal(${file.id})" class="w-full text-left px-3 py-2 rounded-lg hover:bg-surface2 text-red-500 flex items-center gap-2"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            // Render Grid Cards
+            gridContainer.innerHTML = '';
+            items.forEach((file) => {
+                const card = document.createElement('div');
+                const isSelected = selectedFileId === file.id;
+                card.className = `card p-4 hover:border-brand-500 cursor-pointer flex flex-col justify-between transition-all ${isSelected ? 'border-brand-500 shadow-lg shadow-brand-500/10' : ''}`;
+                card.onclick = (e) => {
+                    if (e.target.closest('.row-action-btn')) return;
+                    openDetailsPanel(file.id);
+                };
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="w-10 h-10 rounded-xl bg-surface2 flex items-center justify-center">
+                                <i data-lucide="${file.icon}" class="w-5 h-5 ${file.iconColor}"></i>
+                            </div>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusBadgeMap[file.status]}">
+                                <span class="status-dot ${statusDotMap[file.status]}"></span>
+                                ${file.status}
+                            </span>
+                        </div>
+                        <h4 class="font-bold text-sm truncate mb-1" title="${file.name}">${file.name}</h4>
+                        <p class="text-xs text-app2 mb-3">${file.size} · ${file.category}</p>
+                    </div>
+
+                    <div class="pt-3 border-t border-app flex items-center justify-between text-xs">
+                        <span class="px-2 py-0.5 rounded font-mono text-[10px] font-semibold ${file.nodeColor}">${file.node}</span>
+                        <div class="flex items-center gap-1">
+                            <button onclick="handleQuickDownload(event, ${file.id})" class="row-action-btn p-1.5 rounded-lg hover:bg-surface2 text-app2 hover:text-brand-500" title="Download">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button onclick="handleQuickShare(event, ${file.id})" class="row-action-btn p-1.5 rounded-lg hover:bg-surface2 text-app2 hover:text-brand-500" title="Share">
+                                <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button onclick="openDeleteModal(${file.id})" class="row-action-btn p-1.5 rounded-lg hover:bg-surface2 text-app2 hover:text-red-500" title="Delete">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                gridContainer.appendChild(card);
+            });
+
+            lucide.createIcons();
+        }
+
+        /* ---------------- DETAILS PANEL ---------------- */
+        const detailsPanel = document.getElementById('detailsPanel');
+        const detailsPanelOverlay = document.getElementById('detailsPanelOverlay');
+
+        function openDetailsPanel(fileId) {
+            const file = filesData.find(f => f.id === fileId);
+            if (!file) return;
+
+            selectedFileId = fileId;
+            renderFiles();
+
+            document.getElementById('panelFileName').textContent = file.name;
+            document.getElementById('panelFileCategory').textContent = file.category;
+            document.getElementById('panelBannerName').textContent = file.name;
+            document.getElementById('panelBannerSize').textContent = file.size;
+
+            // Icons & badges
+            document.getElementById('panelFileIcon').setAttribute('data-lucide', file.icon);
+            document.getElementById('panelBannerIcon').setAttribute('data-lucide', file.icon);
+            
+            const badgeEl = document.getElementById('panelStatusBadge');
+            badgeEl.className = `text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${statusBadgeMap[file.status]} flex items-center gap-1`;
+            badgeEl.innerHTML = `<span class="status-dot ${statusDotMap[file.status]}"></span> ${file.status}`;
+
+            document.getElementById('panelEncryptionBadge').textContent = file.encryption;
+
+            // Properties
+            const ext = file.name.split('.').pop().toUpperCase();
+            document.getElementById('propExtension').textContent = ext;
+            document.getElementById('propSize').textContent = file.size;
+            document.getElementById('propCreated').textContent = '2026-07-01 10:00';
+            document.getElementById('propModified').textContent = file.modified;
+            document.getElementById('propOwner').textContent = file.owner;
+            document.getElementById('propNode').textContent = file.node;
+            document.getElementById('propReplicas').textContent = `${file.replicas} Replicas`;
+            document.getElementById('propDownloads').textContent = file.downloads;
+            document.getElementById('propChecksum').textContent = file.checksum;
+            document.getElementById('propLocation').textContent = file.location;
+
+            // Wire action buttons
+            document.getElementById('panelPreviewBtn').onclick = () => openPreviewModal(file.id);
+            document.getElementById('panelDownloadBtn').onclick = (e) => handleQuickDownload(e, file.id);
+            document.getElementById('panelShareBtn').onclick = (e) => handleQuickShare(e, file.id);
+            document.getElementById('panelDeleteBtn').onclick = () => openDeleteModal(file.id);
+
+            lucide.createIcons();
+
+            detailsPanelOverlay.classList.remove('hidden');
+            detailsPanel.classList.remove('translate-x-full');
+        }
+
+        function closeDetailsPanel() {
+            selectedFileId = null;
+            renderFiles();
+            detailsPanel.classList.add('translate-x-full');
+            detailsPanelOverlay.classList.add('hidden');
+        }
+
+        document.getElementById('closeDetailsPanelBtn').addEventListener('click', closeDetailsPanel);
+        detailsPanelOverlay.addEventListener('click', closeDetailsPanel);
+
+        /* ---------------- SEARCH & FILTER LISTENERS ---------------- */
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            currentSearchQuery = e.target.value;
+            renderFiles();
+        });
+
+        document.getElementById('globalNavSearch').addEventListener('input', (e) => {
+            currentSearchQuery = e.target.value;
+            document.getElementById('searchInput').value = e.target.value;
+            renderFiles();
+        });
+
+        document.querySelectorAll('.category-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                document.querySelectorAll('.category-pill').forEach(p => {
+                    p.classList.remove('active');
+                    p.classList.add('text-app2');
+                });
+                pill.classList.add('active');
+                pill.classList.remove('text-app2');
+                selectedCategory = pill.getAttribute('data-category');
+                renderFiles();
+            });
+        });
+
+        document.getElementById('sortSelect').addEventListener('change', (e) => {
+            currentSortMode = e.target.value;
+            renderFiles();
+        });
+
+        document.getElementById('resetFilterBtn').addEventListener('click', () => {
+            currentSearchQuery = '';
+            selectedCategory = 'All';
+            currentSortMode = 'newest';
+            document.getElementById('searchInput').value = '';
+            document.getElementById('globalNavSearch').value = '';
+            document.querySelectorAll('.category-pill').forEach((p, idx) => {
+                if (idx === 0) p.classList.add('active');
+                else p.classList.remove('active');
+            });
+            renderFiles();
+        });
+
+        /* ---------------- GRID / LIST VIEW TOGGLE ---------------- */
+        const listViewBtn = document.getElementById('listViewBtn');
+        const gridViewBtn = document.getElementById('gridViewBtn');
+
+        listViewBtn.addEventListener('click', () => {
+            activeViewMode = 'list';
+            listViewBtn.className = 'p-1.5 rounded-lg bg-card text-brand-500 shadow-sm transition-all';
+            gridViewBtn.className = 'p-1.5 rounded-lg text-app2 hover:text-app transition-all';
+            renderFiles();
+        });
+
+        gridViewBtn.addEventListener('click', () => {
+            activeViewMode = 'grid';
+            gridViewBtn.className = 'p-1.5 rounded-lg bg-card text-brand-500 shadow-sm transition-all';
+            listViewBtn.className = 'p-1.5 rounded-lg text-app2 hover:text-app transition-all';
+            renderFiles();
+        });
+
+        /* ---------------- ROW ACTIONS & MODALS ---------------- */
+        function toggleRowMenu(e, id) {
+            e.stopPropagation();
+            document.querySelectorAll('[id^="rowMenu-"]').forEach(menu => {
+                if (menu.id !== `rowMenu-${id}`) menu.classList.add('hidden');
+            });
+            const targetMenu = document.getElementById(`rowMenu-${id}`);
+            if (targetMenu) targetMenu.classList.toggle('hidden');
+        }
+
+        document.addEventListener('click', () => {
+            document.querySelectorAll('[id^="rowMenu-"]').forEach(menu => menu.classList.add('hidden'));
+        });
+
+        function handleQuickDownload(e, id) {
+            if (e) e.stopPropagation();
+            const file = filesData.find(f => f.id === id);
+            if (file) {
+                fetch(`/api/download?file=${encodeURIComponent(file.name)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        showToast(`Downloading <strong>${file.name}</strong> (${file.size})…`, 'success');
+                    })
+                    .catch(err => {
+                        console.error('Download error:', err);
+                        showToast(`Downloading <strong>${file.name}</strong> (${file.size})…`, 'success');
+                    });
+            }
+        }
+
+        function handleQuickShare(e, id) {
+            if (e) e.stopPropagation();
+            const file = filesData.find(f => f.id === id);
+            if (file) {
+                document.getElementById('shareUrlInput').value = `https://nazeerdfs.io/s/${file.checksum.substring(0, 10)}`;
+                document.getElementById('shareModal').classList.remove('hidden');
+            }
+        }
+
+        function handleMoveFile(id) {
+            const file = filesData.find(f => f.id === id);
+            if (file) {
+                showToast(`Relocating <strong>${file.name}</strong> to Node 5000…`, 'info');
+            }
+        }
+
+        // Rename modal
+        let targetRenameId = null;
+        function openRenameModal(id) {
+            targetRenameId = id;
+            const file = filesData.find(f => f.id === id);
+            if (file) {
+                document.getElementById('renameInput').value = file.name;
+                document.getElementById('renameModal').classList.remove('hidden');
+            }
+        }
+
+        document.getElementById('confirmRenameBtn').addEventListener('click', () => {
+            const newName = document.getElementById('renameInput').value.trim();
+            if (newName && targetRenameId) {
+                const file = filesData.find(f => f.id === targetRenameId);
+                if (file) {
+                    file.name = newName;
+                    renderFiles();
+                    showToast(`File renamed to <strong>${newName}</strong>`, 'success');
+                }
+            }
+            document.getElementById('renameModal').classList.add('hidden');
+        });
+
+        // Delete modal
+        let targetDeleteId = null;
+        function openDeleteModal(id) {
+            targetDeleteId = id;
+            const file = filesData.find(f => f.id === id);
+            if (file) {
+                document.getElementById('deleteTargetFileName').textContent = file.name;
+                document.getElementById('deleteModal').classList.remove('hidden');
+            }
+        }
+
+        document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
+            if (targetDeleteId) {
+                const fileToDelete = filesData.find(f => f.id === targetDeleteId);
+                const fileName = fileToDelete ? fileToDelete.name : '';
+                fetch(`/api/delete?file=${encodeURIComponent(fileName)}`, { method: 'DELETE' })
+                    .then(res => res.json())
+                    .then(() => {
+                        filesData = filesData.filter(f => f.id !== targetDeleteId);
+                        renderFiles();
+                        showToast(`File permanently deleted from cluster.`, 'warning');
+                        if (selectedFileId === targetDeleteId) closeDetailsPanel();
+                    })
+                    .catch(err => {
+                        console.error('Delete error:', err);
+                        filesData = filesData.filter(f => f.id !== targetDeleteId);
+                        renderFiles();
+                        showToast(`File permanently deleted from cluster.`, 'warning');
+                        if (selectedFileId === targetDeleteId) closeDetailsPanel();
+                    });
+            }
+            document.getElementById('deleteModal').classList.add('hidden');
+        });
+
+        // Preview Modal
+        function openPreviewModal(id) {
+            const file = filesData.find(f => f.id === id);
+            if (!file) return;
+            document.getElementById('previewTitle').textContent = file.name;
+            document.getElementById('previewNameSub').textContent = file.name;
+            document.getElementById('previewFileIcon').setAttribute('data-lucide', file.icon);
+            document.getElementById('previewCenterIcon').setAttribute('data-lucide', file.icon);
+            document.getElementById('previewDownloadActionBtn').onclick = (e) => handleQuickDownload(e, file.id);
+            lucide.createIcons();
+            document.getElementById('previewModal').classList.remove('hidden');
+        }
+
+        // Close buttons for modals
+        document.querySelectorAll('.closeModalBtn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#uploadModal, #folderModal, #shareModal, #renameModal, #deleteModal, #previewModal').forEach(modal => {
+                    modal.classList.add('hidden');
+                });
+            });
+        });
+
+        // Open Upload & Folder modals
+        document.getElementById('openUploadModalBtn').addEventListener('click', () => {
+            document.getElementById('uploadModal').classList.remove('hidden');
+        });
+
+        document.getElementById('quickUploadNavBtn').addEventListener('click', () => {
+            document.getElementById('uploadModal').classList.remove('hidden');
+        });
+
+        document.getElementById('openFolderModalBtn').addEventListener('click', () => {
+            document.getElementById('folderModal').classList.remove('hidden');
+        });
+
+        document.getElementById('confirmCreateFolderBtn').addEventListener('click', () => {
+            const name = document.getElementById('folderNameInput').value.trim();
+            if (name) {
+                showToast(`Folder <strong>${name}</strong> created successfully.`, 'success');
+                document.getElementById('folderNameInput').value = '';
+            }
+            document.getElementById('folderModal').classList.add('hidden');
+        });
+
+        document.getElementById('startUploadBtn').addEventListener('click', () => {
+            document.getElementById('uploadModal').classList.add('hidden');
+            showToast(`Inbound file upload queued to cluster.`, 'info');
+        });
+
+        document.getElementById('copyShareLinkBtn').addEventListener('click', () => {
+            const input = document.getElementById('shareUrlInput');
+            navigator.clipboard?.writeText(input.value);
+            showToast('Encrypted share link copied to clipboard!', 'success');
+        });
+
+        document.getElementById('copyChecksumBtn').addEventListener('click', () => {
+            const val = document.getElementById('propChecksum').textContent;
+            navigator.clipboard?.writeText(val);
+            showToast('Checksum copied to clipboard!', 'info');
+        });
+
+        document.getElementById('copyLocationBtn').addEventListener('click', () => {
+            const val = document.getElementById('propLocation').textContent;
+            navigator.clipboard?.writeText(val);
+            showToast('Storage chunk path copied to clipboard!', 'info');
+        });
+
+        /* ---------------- KEYBOARD SHORTCUTS ---------------- */
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                document.getElementById('searchInput').focus();
+            }
+            if (e.key === 'Escape') {
+                closeDetailsPanel();
+                document.querySelectorAll('#uploadModal, #folderModal, #shareModal, #renameModal, #deleteModal, #previewModal').forEach(modal => {
+                    modal.classList.add('hidden');
+                });
+            }
+        });
+
+        /* ---------------- STORAGE DISTRIBUTION DONUT CHART ---------------- */
+        let donutChart = null;
+        function updateChartColors() {
+            if (!donutChart) return;
+            const isDark = root.classList.contains('dark');
+            donutChart.options.plugins.legend.labels.color = isDark ? '#F8FAFC' : '#0F172A';
+            donutChart.update();
+        }
+
+        function initDonutChart() {
+            const ctx = document.getElementById('storageDonutChart').getContext('2d');
+            const isDark = root.classList.contains('dark');
+
+            donutChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Node 3000', 'Node 4000', 'Node 5000'],
+                    datasets: [{
+                        data: [4.2, 2.1, 1.0],
+                        backgroundColor: ['#F97316', '#F59E0B', '#06B6D4'],
+                        borderWidth: 0,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '72%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                            titleColor: isDark ? '#F8FAFC' : '#0F172A',
+                            bodyColor: isDark ? '#CBD5E1' : '#475569',
+                            borderColor: isDark ? '#475569' : '#CBD5E1',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: true,
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.label}: ${context.raw} TB Storage`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        initDonutChart();
+
+        /* ---------------- LIVE RECENT ACTIVITY WIDGET ---------------- */
+        const activityEvents = [
+            { title: 'Uploaded report.pdf', node: 'Node 3000', icon: 'file-text', color: 'text-brand-500' },
+            { title: 'Replicated backup.zip', node: 'Node 4000', icon: 'archive', color: 'text-amber-500' },
+            { title: 'Deleted notes.docx', node: 'Node 5000', icon: 'trash-2', color: 'text-red-500' },
+            { title: 'Synced video.mp4', node: 'Node 3000', icon: 'video', color: 'text-cyan-500' },
+            { title: 'Verified Checksum v5', node: 'Node 4000', icon: 'shield-check', color: 'text-emerald-500' },
+            { title: 'Allocated Chunk #89A', node: 'Node 5000', icon: 'database', color: 'text-blue-500' },
+        ];
+
+        const timelineContainer = document.getElementById('activityTimeline');
+        let actIndex = 0;
+
+        function pushActivityLog() {
+            const ev = activityEvents[actIndex % activityEvents.length];
+            actIndex++;
+
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            const item = document.createElement('div');
+            item.className = 'flex items-center justify-between p-2.5 rounded-xl bg-surface2/50 border border-app hover:bg-surface2 transition-colors fade-in';
+            item.innerHTML = `
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-7 h-7 rounded-lg bg-surface2 flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="${ev.icon}" class="w-3.5 h-3.5 ${ev.color}"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="font-medium text-app truncate">${ev.title}</p>
+                        <p class="text-[10px] text-app2">${ev.node}</p>
+                    </div>
+                </div>
+                <span class="text-[10px] font-mono text-app2 flex-shrink-0 ml-2">${timeStr}</span>
+            `;
+
+            timelineContainer.prepend(item);
+            lucide.createIcons();
+
+            while (timelineContainer.children.length > 5) {
+                timelineContainer.removeChild(timelineContainer.lastChild);
+            }
+        }
+
+        // Initialize 4 initial activity entries
+        for (let i = 0; i < 4; i++) pushActivityLog();
+        setInterval(pushActivityLog, 4500);
+
+        /* ---------------- UPLOAD QUEUE ANIMATED PROGRESS ---------------- */
+        let uploadProgress = 74;
+        const queueProgressBar = document.getElementById('queueProgressBar');
+        const queueProgressPct = document.getElementById('queueProgressPct');
+        const queueSpeed = document.getElementById('queueSpeed');
+        const queueEta = document.getElementById('queueEta');
+
+        setInterval(() => {
+            uploadProgress += Math.random() * 6 + 2;
+            if (uploadProgress >= 100) {
+                uploadProgress = 12;
+                showToast('Upload <strong>enterprise-architecture-2026.iso</strong> completed!', 'success');
+            }
+            queueProgressBar.style.width = `${Math.round(uploadProgress)}%`;
+            queueProgressPct.textContent = `${Math.round(uploadProgress)}%`;
+            queueSpeed.textContent = `${(120 + Math.random() * 15).toFixed(1)} MB/s`;
+            const remSec = Math.max(1, Math.round((100 - uploadProgress) / 7));
+            queueEta.textContent = `${remSec}s remaining`;
+        }, 1200);
+
+        // Initial render & fetch from API
+        fetch('/api/files')
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data) && data.length > 0) {
+                    filesData = data;
+                }
+                renderFiles();
+            })
+            .catch(err => {
+                console.error('Error loading files:', err);
+                renderFiles();
+            });
+    </script>
+</body>
+
+</html>
