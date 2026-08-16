@@ -2,6 +2,8 @@ package handler
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/yigithankarabulut/distributed-file-storage/config"
 	"github.com/yigithankarabulut/distributed-file-storage/crypto"
@@ -23,9 +25,10 @@ func init() {
 
 	gdriveStore := store.NewGDriveStore("credentials.json", store.DefaultVaultFolderName)
 
-	s1 := makeServerNode("3000_network", encryptKey, gdriveStore)
-	s2 := makeServerNode("4000_network", encryptKey, gdriveStore)
-	s3 := makeServerNode("5000_network", encryptKey, gdriveStore)
+	tmpDir := os.TempDir()
+	s1 := makeServerNode(filepath.Join(tmpDir, "3000_network"), encryptKey, gdriveStore)
+	s2 := makeServerNode(filepath.Join(tmpDir, "4000_network"), encryptKey, gdriveStore)
+	s3 := makeServerNode(filepath.Join(tmpDir, "5000_network"), encryptKey, gdriveStore)
 
 	servers := []*fileserver.FileServer{s1, s2, s3}
 	database := db.Connect(cfg)
