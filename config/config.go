@@ -22,7 +22,7 @@ type Config struct {
 
 // LoadConfig loads configuration from environment variables or sensible defaults.
 func LoadConfig() *Config {
-	httpPort := getEnv("HTTP_PORT", "8080")
+	httpPort := getEnv("PORT", getEnv("HTTP_PORT", "8080"))
 	secretKey := getEnv("SECRET_KEY", "nazeerdfs_super_secret_production_key_2026")
 	tlsEnabled, _ := strconv.ParseBool(getEnv("TLS_ENABLED", "false"))
 
