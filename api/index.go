@@ -1,4 +1,4 @@
-package api
+package handler
 
 import (
 	"net/http"
@@ -8,11 +8,12 @@ import (
 	"github.com/yigithankarabulut/distributed-file-storage/db"
 	"github.com/yigithankarabulut/distributed-file-storage/fileserver"
 	"github.com/yigithankarabulut/distributed-file-storage/p2p"
+	"github.com/yigithankarabulut/distributed-file-storage/pkg/api"
 	"github.com/yigithankarabulut/distributed-file-storage/store"
 )
 
 var (
-	appInstance *App
+	appInstance *api.App
 	muxInstance *http.ServeMux
 )
 
@@ -29,9 +30,9 @@ func init() {
 	servers := []*fileserver.FileServer{s1, s2, s3}
 	database := db.Connect(cfg)
 
-	appInstance = New(servers, database)
+	appInstance = api.New(servers, database)
 	muxInstance = http.NewServeMux()
-	RegisterRoutes(muxInstance, appInstance)
+	api.RegisterRoutes(muxInstance, appInstance)
 }
 
 func makeServerNode(storageRoot string, encryptKey []byte, gdriveStore *store.GDriveStore) *fileserver.FileServer {

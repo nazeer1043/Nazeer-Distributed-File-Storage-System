@@ -13,12 +13,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yigithankarabulut/distributed-file-storage/api"
 	"github.com/yigithankarabulut/distributed-file-storage/config"
 	"github.com/yigithankarabulut/distributed-file-storage/crypto"
 	"github.com/yigithankarabulut/distributed-file-storage/db"
 	"github.com/yigithankarabulut/distributed-file-storage/fileserver"
 	"github.com/yigithankarabulut/distributed-file-storage/p2p"
+	"github.com/yigithankarabulut/distributed-file-storage/pkg/api"
 	"github.com/yigithankarabulut/distributed-file-storage/store"
 )
 
