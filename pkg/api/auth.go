@@ -14,25 +14,25 @@ import (
 const sessionCookieName = "nazeerdfs_session"
 const sessionDuration = 8 * time.Hour
 
-// Security Decision:
-// Storing SHA-256 hash of "admin123" instead of plaintext to prevent raw password exposure in source code.
-// Constant-time comparison is used via crypto/subtle to protect against timing attacks.
-// TODO: Replace package-level hash constant with database/environment configuration in future phases.
-const (
-	adminUsername     = "admin"
-	adminPasswordHash = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9" // SHA-256 hash of "admin123"
-)
-
 type User struct {
 	Username string `json:"username"`
 	Name     string `json:"name"`
 	Role     string `json:"role"`
 }
 
-var defaultAdminUser = User{
-	Username: "admin",
-	Name:     "Administrator",
-	Role:     "Cluster Admin",
+type userStore struct {
+	mu    sync.RWMutex
+	users map[string]string // username -> SHA-256 password hash
+	names map[string]string // username -> Display Name
+}
+
+var globalUsers = &userStore{
+	users: map[string]string{
+		"admin": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9", // admin123
+	},
+	names: map[string]string{
+		"admin": "Administrator",
+	},
 }
 
 type sessionData struct {
@@ -96,6 +96,12 @@ type LoginResponse struct {
 	Message string `json:"message,omitempty"`
 }
 
+type RegisterRequest struct {
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 type SessionResponse struct {
 	Authenticated bool  `json:"authenticated"`
 	User          *User `json:"user,omitempty"`
@@ -123,10 +129,12 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	reqHash := sha256.Sum256([]byte(req.Password))
 	reqHashHex := hex.EncodeToString(reqHash[:])
 
-	userMatch := subtle.ConstantTimeCompare([]byte(req.Username), []byte(adminUsername)) == 1
-	passMatch := subtle.ConstantTimeCompare([]byte(reqHashHex), []byte(adminPasswordHash)) == 1
+	globalUsers.mu.RLock()
+	expectedHash, exists := globalUsers.users[req.Username]
+	displayName := globalUsers.names[req.Username]
+	globalUsers.mu.RUnlock()
 
-	if !userMatch || !passMatch {
+	if !exists {
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(LoginResponse{
 			Success: false,
@@ -135,7 +143,26 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := globalSessions.create(defaultAdminUser)
+	if subtle.ConstantTimeCompare([]byte(reqHashHex), []byte(expectedHash)) != 1 {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(LoginResponse{
+			Success: false,
+			Message: "Invalid username or password",
+		})
+		return
+	}
+
+	if displayName == "" {
+		displayName = req.Username
+	}
+
+	user := User{
+		Username: req.Username,
+		Name:     displayName,
+		Role:     "Cluster Admin",
+	}
+
+	token, err := globalSessions.create(user)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(LoginResponse{
@@ -157,7 +184,81 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(LoginResponse{
 		Success: true,
-		User:    &defaultAdminUser,
+		User:    &user,
+	})
+}
+
+// RegisterHandler handles POST /api/register
+func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var req RegisterRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"message": "Invalid request payload",
+		})
+		return
+	}
+
+	username := req.Email
+	if username == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"message": "Email is required",
+		})
+		return
+	}
+
+	if len(req.Password) < 3 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"message": "Password must be at least 3 characters",
+		})
+		return
+	}
+
+	passHash := sha256.Sum256([]byte(req.Password))
+	passHashHex := hex.EncodeToString(passHash[:])
+
+	if req.Name == "" {
+		req.Name = username
+	}
+
+	globalUsers.mu.Lock()
+	globalUsers.users[username] = passHashHex
+	globalUsers.names[username] = req.Name
+	globalUsers.mu.Unlock()
+
+	newUser := User{
+		Username: username,
+		Name:     req.Name,
+		Role:     "Cluster Admin",
+	}
+
+	token, _ := globalSessions.create(newUser)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   int(sessionDuration.Seconds()),
+	})
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"user":    newUser,
 	})
 }
 
@@ -218,7 +319,7 @@ func SessionHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// RequireAuth is a reusable HTTP middleware to protect endpoints using session cookies.
+// RequireAuth protected route middleware
 func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(sessionCookieName)

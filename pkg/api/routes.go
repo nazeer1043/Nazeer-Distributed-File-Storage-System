@@ -5,6 +5,7 @@ import "net/http"
 // RegisterRoutes registers all HTTP API routes onto the provided ServeMux using the App instance.
 func RegisterRoutes(mux *http.ServeMux, a *App) {
 	mux.HandleFunc("/api/login", LoginHandler)
+	mux.HandleFunc("/api/register", RegisterHandler)
 	mux.HandleFunc("/api/logout", LogoutHandler)
 	mux.HandleFunc("/api/session", SessionHandler)
 	mux.HandleFunc("/api/dashboard", RequireAuth(a.DashboardHandler))

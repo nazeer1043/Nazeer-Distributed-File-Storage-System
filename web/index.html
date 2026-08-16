@@ -880,9 +880,63 @@
             });
 
             // ---------- REGISTER FORM SUBMISSION ----------
-            registerForm.addEventListener('submit', function (e) {
+            const regBtn = registerForm.querySelector('.btn-primary');
+            let regError = document.getElementById('regError');
+            if (!regError) {
+                regError = document.createElement('div');
+                regError.id = 'regError';
+                regError.style.color = '#ef4444';
+                regError.style.fontSize = '13px';
+                regError.style.marginTop = '8px';
+                regError.style.fontWeight = '500';
+                regError.style.display = 'none';
+                registerForm.insertBefore(regError, regBtn);
+            }
+
+            registerForm.addEventListener('submit', async function (e) {
                 e.preventDefault();
-                alert('Account registration submitted. Please contact system administrator.');
+                const nameInput = document.getElementById('regName');
+                const emailInput = document.getElementById('regEmail');
+                const passInput = document.getElementById('regPassword');
+
+                const name = nameInput ? nameInput.value.trim() : '';
+                const email = emailInput ? emailInput.value.trim() : '';
+                const password = passInput ? passInput.value : '';
+
+                regError.style.display = 'none';
+                regError.textContent = '';
+
+                if (!email || !password) {
+                    regError.textContent = 'Work Email and password are required.';
+                    regError.style.display = 'block';
+                    return;
+                }
+
+                const originalText = regBtn.innerHTML;
+                regBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating Account…';
+                regBtn.disabled = true;
+
+                try {
+                    const res = await fetch('/api/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: name || email, email: email, password: password })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        window.location.href = 'dashboard.html';
+                    } else {
+                        regError.textContent = data.message || 'Failed to create account.';
+                        regError.style.display = 'block';
+                    }
+                } catch (err) {
+                    console.error('Registration error:', err);
+                    regError.textContent = 'Network error. Please try again.';
+                    regError.style.display = 'block';
+                } finally {
+                    regBtn.innerHTML = originalText;
+                    regBtn.disabled = false;
+                }
             });
 
             // ---------- FORGOT PASSWORD ----------
