@@ -810,31 +810,44 @@
         }
         buildChart();
 
-        /* ---------------- RECENT UPLOADS ---------------- */
-        const uploads = [
-            { name: 'quarterly-backup.tar.gz', size: '4.2 GB', node: 'node-a1', time: '2m ago', icon: 'archive' },
-            { name: 'ml-dataset-v3.parquet', size: '1.8 GB', node: 'node-b2', time: '14m ago', icon: 'file-bar-chart' },
-            { name: 'infra-snapshot.img', size: '9.6 GB', node: 'node-a1', time: '41m ago', icon: 'hard-drive-download' },
-            { name: 'audit-logs-2026-07.zip', size: '640 MB', node: 'node-c3', time: '1h ago', icon: 'file-archive' },
-            { name: 'customer-export.csv', size: '212 MB', node: 'node-b2', time: '3h ago', icon: 'file-spreadsheet' },
-        ];
+        /* ---------------- RECENT UPLOADS (LIVE REAL DATA) ---------------- */
         const uploadsTable = document.getElementById('uploadsTable');
-        uploads.forEach((u, i) => {
-            const row = document.createElement('div');
-            row.className = 'flex items-center gap-3 py-2.5 px-2 rounded-xl hover:bg-surface2 fade-in';
-            row.style.animationDelay = (i * 70) + 'ms';
-            row.innerHTML = `
-    <div class="w-9 h-9 rounded-lg bg-surface2 flex items-center justify-center flex-shrink-0">
-      <i data-lucide="${u.icon}" class="w-4 h-4 text-brand-500"></i>
-    </div>
-    <div class="min-w-0 flex-1">
-      <p class="text-sm font-medium truncate">${u.name}</p>
-      <p class="text-[11px] text-app2">${u.size} · ${u.node}</p>
-    </div>
-    <span class="text-[11px] text-app2 flex-shrink-0">${u.time}</span>
-  `;
-            uploadsTable.appendChild(row);
-        });
+        fetch('/api/files')
+            .then(res => res.json())
+            .then(files => {
+                uploadsTable.innerHTML = '';
+                if (!Array.isArray(files) || files.length === 0) {
+                    uploadsTable.innerHTML = `
+                        <div class="py-8 text-center text-app2">
+                            <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+                            <p class="text-xs font-medium">No uploaded files in cluster yet</p>
+                            <p class="text-[11px] text-app2 opacity-75">Upload a file to see real-time cluster replication</p>
+                        </div>`;
+                    if (window.lucide) lucide.createIcons();
+                    return;
+                }
+                files.slice(0, 5).forEach((u, i) => {
+                    const row = document.createElement('div');
+                    row.className = 'flex items-center gap-3 py-2.5 px-2 rounded-xl hover:bg-surface2 fade-in';
+                    row.style.animationDelay = (i * 70) + 'ms';
+                    row.innerHTML = `
+                        <div class="w-9 h-9 rounded-lg bg-surface2 flex items-center justify-center flex-shrink-0">
+                          <i data-lucide="${u.icon || 'file-text'}" class="w-4 h-4 text-brand-500"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <p class="text-sm font-medium truncate">${u.name}</p>
+                          <p class="text-[11px] text-app2">${u.size} · ${u.node || 'Node 3000'}</p>
+                        </div>
+                        <span class="text-[11px] text-app2 flex-shrink-0">${u.modified || 'Just now'}</span>
+                    `;
+                    uploadsTable.appendChild(row);
+                });
+                if (window.lucide) lucide.createIcons();
+            })
+            .catch(err => {
+                console.error('Error fetching recent uploads:', err);
+                uploadsTable.innerHTML = `<p class="text-xs text-app2 p-3">No uploaded files in cluster yet.</p>`;
+            });
 
         /* ---------------- LIVE TIMELINE ---------------- */
         const timelineEvents = [

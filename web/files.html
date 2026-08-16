@@ -1169,21 +1169,24 @@
             }, 3200);
         }
 
-        /* ---------------- REALISTIC ENTERPRISE FILES DATA ---------------- */
-        let filesData = [
-            { id: 1, name: 'annual-report-2026.pdf', size: '24.8 MB', rawSize: 25999000, category: 'Documents', owner: 'Mohammed Nazeer Ali', node: 'Node 3000', nodeColor: 'text-brand-500 bg-brand-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-28 14:20', icon: 'file-text', iconColor: 'text-red-500', checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', encryption: 'AES-256-GCM', downloads: '1,420', location: 'node-3000:/data/chunks/ch_8f9a2' },
-            { id: 2, name: 'client-backup.tar.gz', size: '14.2 GB', rawSize: 15247000000, category: 'Archives', owner: 'DevOps Team', node: 'Node 4000', nodeColor: 'text-amber-500 bg-amber-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-28 11:45', icon: 'archive', iconColor: 'text-amber-500', checksum: '8f4a2190b2e3158c67a3f1295914197365287f1a', encryption: 'AES-256-GCM', downloads: '384', location: 'node-4000:/data/backups/bk_491a' },
-            { id: 3, name: 'holiday-photos.zip', size: '1.2 GB', rawSize: 1288000000, category: 'Archives', owner: 'Sarah Connor', node: 'Node 5000', nodeColor: 'text-cyan-500 bg-cyan-500/10', replicas: '2/3', status: 'Replicating', modified: '2026-07-27 18:30', icon: 'file-archive', iconColor: 'text-brand-500', checksum: 'c4a91b290184a7e930129fbc8129731', encryption: 'AES-256-GCM', downloads: '52', location: 'node-5000:/data/media/ph_102' },
-            { id: 4, name: 'financial-data.xlsx', size: '8.4 MB', rawSize: 8808000, category: 'Documents', owner: 'Finance Lead', node: 'Node 3000', nodeColor: 'text-brand-500 bg-brand-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-27 09:15', icon: 'file-spreadsheet', iconColor: 'text-emerald-500', checksum: '7190abc12019485bc920412895710', encryption: 'AES-256-GCM', downloads: '890', location: 'node-3000:/data/finance/fn_2026' },
-            { id: 5, name: 'cluster-log-28-july.txt', size: '512 KB', rawSize: 524288, category: 'Others', owner: 'System Automated', node: 'Node 4000', nodeColor: 'text-amber-500 bg-amber-500/10', replicas: '3/3', status: 'Syncing', modified: '2026-07-28 20:05', icon: 'file-code', iconColor: 'text-blue-500', checksum: '3f90129a1b2c4d5e6f7a8b9c0d1e2f3a', encryption: 'AES-256-GCM', downloads: '2,150', location: 'node-4000:/var/log/cluster_28Jul' },
-            { id: 6, name: 'presentation.pptx', size: '45.1 MB', rawSize: 47290000, category: 'Documents', owner: 'Product Manager', node: 'Node 3000', nodeColor: 'text-brand-500 bg-brand-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-26 16:40', icon: 'presentation', iconColor: 'text-orange-500', checksum: '9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d', encryption: 'AES-256-GCM', downloads: '67', location: 'node-3000:/data/decks/deck_v4' },
-            { id: 7, name: 'promo-video-4k.mp4', size: '3.8 GB', rawSize: 4080000000, category: 'Videos', owner: 'Marketing Team', node: 'Node 5000', nodeColor: 'text-cyan-500 bg-cyan-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-25 12:10', icon: 'video', iconColor: 'text-purple-500', checksum: '11223344556677889900aabbccddeeff', encryption: 'AES-256-GCM', downloads: '310', location: 'node-5000:/data/videos/promo_4k' },
-            { id: 8, name: 'kernel-build-v5.iso', size: '4.7 GB', rawSize: 5046000000, category: 'Others', owner: 'Linux Kernel Team', node: 'Node 4000', nodeColor: 'text-amber-500 bg-amber-500/10', replicas: '1/3', status: 'Warning', modified: '2026-07-24 17:00', icon: 'disc', iconColor: 'text-slate-400', checksum: 'aabbccdd112233445566778899001122', encryption: 'AES-256-GCM', downloads: '145', location: 'node-4000:/data/iso/kernel_v5' },
-            { id: 9, name: 'customer-db-dump.sql', size: '640 MB', rawSize: 671088640, category: 'Documents', owner: 'DB Admin', node: 'Node 3000', nodeColor: 'text-brand-500 bg-brand-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-28 08:30', icon: 'database', iconColor: 'text-indigo-500', checksum: 'ffeeddccbbaa99887766554433221100', encryption: 'AES-256-GCM', downloads: '93', location: 'node-3000:/data/db/prod_dump_jul' },
-            { id: 10, name: 'hero-banner-hd.png', size: '18.4 MB', rawSize: 19293798, category: 'Images', owner: 'Design Lead', node: 'Node 5000', nodeColor: 'text-cyan-500 bg-cyan-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-28 13:00', icon: 'image', iconColor: 'text-pink-500', checksum: '1234567890abcdef1234567890abcdef', encryption: 'AES-256-GCM', downloads: '540', location: 'node-5000:/data/design/banner_hd' },
-            { id: 11, name: 'system-config.yaml', size: '12 KB', rawSize: 12288, category: 'Others', owner: 'DevOps Lead', node: 'Node 4000', nodeColor: 'text-amber-500 bg-amber-500/10', replicas: '0/3', status: 'Offline', modified: '2026-07-23 10:20', icon: 'file-cog', iconColor: 'text-rose-500', checksum: 'f1e2d3c4b5a697887766554433221100', encryption: 'AES-256-GCM', downloads: '12', location: 'node-4000:/etc/nazeerdfs/config' },
-            { id: 12, name: 'ml-model-weights.bin', size: '8.9 GB', rawSize: 9556000000, category: 'Others', owner: 'AI Research', node: 'Node 3000', nodeColor: 'text-brand-500 bg-brand-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-28 03:15', icon: 'brain-circuit', iconColor: 'text-teal-500', checksum: '00112233445566778899aabbccddeeff', encryption: 'AES-256-GCM', downloads: '410', location: 'node-3000:/data/models/weights_v9' },
-        ];
+        /* ---------------- REALTIME CLUSTER FILES DATA ---------------- */
+        let filesData = [];
+
+        async function fetchLiveFiles() {
+            try {
+                const res = await fetch('/api/files');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data)) {
+                        filesData = data;
+                        renderFiles();
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching cluster files:', err);
+                renderFiles();
+            }
+        }
 
         let selectedCategory = 'All';
         let currentSearchQuery = '';
@@ -1771,7 +1774,7 @@
         fetch('/api/files')
             .then(res => res.json())
             .then(data => {
-                if (Array.isArray(data) && data.length > 0) {
+                if (Array.isArray(data)) {
                     filesData = data;
                 }
                 renderFiles();
