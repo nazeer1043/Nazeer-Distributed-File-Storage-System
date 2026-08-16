@@ -276,15 +276,16 @@ func (s *FileServer) StoreWithMeta(key string, filename string, owner string, co
 	}
 
 	if s.GDrive != nil && s.GDrive.Enabled {
-		// Encrypt and upload payload asynchronously to Google Drive 400GB Cloud Backup Tier
-		go func(k, fname string, rawPayload []byte) {
-			encBuf := new(bytes.Buffer)
-			if _, encErr := crypto.CopyEncrypt(s.EncryptKey, bytes.NewReader(rawPayload), encBuf); encErr == nil {
-				_, _ = s.GDrive.UploadFile(k, fname, encBuf)
+		encBuf := new(bytes.Buffer)
+		if _, encErr := crypto.CopyEncrypt(s.EncryptKey, bytes.NewReader(data), encBuf); encErr == nil {
+			if driveFile, gdriveErr := s.GDrive.UploadFile(key, filename, encBuf); gdriveErr == nil {
+				log.Printf("[%s] Google Drive Cloud Backup upload successful for (%s)! Drive File ID: %s\n", s.ListenAddr, filename, driveFile.Id)
 			} else {
-				log.Printf("[%s] GDrive encryption error: %v\n", s.ListenAddr, encErr)
+				log.Printf("[%s] GDrive upload error for (%s): %v\n", s.ListenAddr, filename, gdriveErr)
 			}
-		}(key, filename, data)
+		} else {
+			log.Printf("[%s] GDrive encryption error: %v\n", s.ListenAddr, encErr)
+		}
 	}
 
 	return meta, nil

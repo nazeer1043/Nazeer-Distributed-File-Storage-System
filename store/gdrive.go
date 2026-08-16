@@ -55,7 +55,7 @@ func NewGDriveStore(credentialsPath string, vaultFolderName string) *GDriveStore
 	var srv *drive.Service
 
 	if strings.Contains(string(credsBytes), `"service_account"`) {
-		srv, err = drive.NewService(ctx, option.WithCredentialsFile(credentialsPath), option.WithScopes(drive.DriveScope))
+		srv, err = drive.NewService(ctx, option.WithCredentialsJSON(credsBytes), option.WithScopes(drive.DriveScope))
 		if err != nil {
 			log.Printf("[GDrive] Warning: Failed to initialize Google Drive service account: %v\n", err)
 			return gs
