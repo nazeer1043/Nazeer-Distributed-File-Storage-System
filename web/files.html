@@ -361,10 +361,10 @@
         </div>
 
         <div class="border-t border-app p-4 flex items-center gap-3">
-            <img src="https://api.dicebear.com/7.x/notionists/svg?seed=Arjun"
+            <img src="https://api.dicebear.com/7.x/notionists/svg?seed=MohammedNazeer"
                 class="w-9 h-9 rounded-full bg-surface2 flex-shrink-0" alt="User avatar">
             <div class="min-w-0 flex-1">
-                <p class="text-sm font-semibold truncate">Arjun Nazeer</p>
+                <p id="sidebarUserName" class="text-sm font-semibold truncate user-name-display">Mohammed Nazeer Ali</p>
                 <p class="text-[11px] text-app2 truncate">Cluster Admin</p>
             </div>
             <i data-lucide="chevron-right" class="w-4 h-4 text-app2 flex-shrink-0"></i>
@@ -418,7 +418,7 @@
 
                 <div class="relative">
                     <button id="profileBtn" class="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-surface2">
-                        <img src="https://api.dicebear.com/7.x/notionists/svg?seed=Arjun"
+                        <img src="https://api.dicebear.com/7.x/notionists/svg?seed=MohammedNazeer"
                             class="w-8 h-8 rounded-full bg-surface2" alt="Profile">
                         <i data-lucide="chevron-down" class="w-4 h-4 text-app2 hidden md:block"></i>
                     </button>
@@ -792,7 +792,7 @@
                     </div>
                     <div class="p-3 flex justify-between items-center">
                         <span class="text-app2">Owner</span>
-                        <span id="propOwner" class="font-semibold text-brand-500">Arjun Nazeer</span>
+                        <span id="propOwner" class="font-semibold text-brand-500 user-name-display">Mohammed Nazeer Ali</span>
                     </div>
                     <div class="p-3 flex justify-between items-center">
                         <span class="text-app2">Primary Node</span>
@@ -1171,7 +1171,7 @@
 
         /* ---------------- REALISTIC ENTERPRISE FILES DATA ---------------- */
         let filesData = [
-            { id: 1, name: 'annual-report-2026.pdf', size: '24.8 MB', rawSize: 25999000, category: 'Documents', owner: 'Arjun Nazeer', node: 'Node 3000', nodeColor: 'text-brand-500 bg-brand-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-28 14:20', icon: 'file-text', iconColor: 'text-red-500', checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', encryption: 'AES-256-GCM', downloads: '1,420', location: 'node-3000:/data/chunks/ch_8f9a2' },
+            { id: 1, name: 'annual-report-2026.pdf', size: '24.8 MB', rawSize: 25999000, category: 'Documents', owner: 'Mohammed Nazeer Ali', node: 'Node 3000', nodeColor: 'text-brand-500 bg-brand-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-28 14:20', icon: 'file-text', iconColor: 'text-red-500', checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', encryption: 'AES-256-GCM', downloads: '1,420', location: 'node-3000:/data/chunks/ch_8f9a2' },
             { id: 2, name: 'client-backup.tar.gz', size: '14.2 GB', rawSize: 15247000000, category: 'Archives', owner: 'DevOps Team', node: 'Node 4000', nodeColor: 'text-amber-500 bg-amber-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-28 11:45', icon: 'archive', iconColor: 'text-amber-500', checksum: '8f4a2190b2e3158c67a3f1295914197365287f1a', encryption: 'AES-256-GCM', downloads: '384', location: 'node-4000:/data/backups/bk_491a' },
             { id: 3, name: 'holiday-photos.zip', size: '1.2 GB', rawSize: 1288000000, category: 'Archives', owner: 'Sarah Connor', node: 'Node 5000', nodeColor: 'text-cyan-500 bg-cyan-500/10', replicas: '2/3', status: 'Replicating', modified: '2026-07-27 18:30', icon: 'file-archive', iconColor: 'text-brand-500', checksum: 'c4a91b290184a7e930129fbc8129731', encryption: 'AES-256-GCM', downloads: '52', location: 'node-5000:/data/media/ph_102' },
             { id: 4, name: 'financial-data.xlsx', size: '8.4 MB', rawSize: 8808000, category: 'Documents', owner: 'Finance Lead', node: 'Node 3000', nodeColor: 'text-brand-500 bg-brand-500/10', replicas: '3/3', status: 'Healthy', modified: '2026-07-27 09:15', icon: 'file-spreadsheet', iconColor: 'text-emerald-500', checksum: '7190abc12019485bc920412895710', encryption: 'AES-256-GCM', downloads: '890', location: 'node-3000:/data/finance/fn_2026' },
