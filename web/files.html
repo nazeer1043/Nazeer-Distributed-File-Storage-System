@@ -1504,15 +1504,16 @@
             if (e) e.stopPropagation();
             const file = filesData.find(f => f.id === id);
             if (file) {
-                fetch(`/api/download?file=${encodeURIComponent(file.name)}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        showToast(`Downloading <strong>${file.name}</strong> (${file.size})…`, 'success');
-                    })
-                    .catch(err => {
-                        console.error('Download error:', err);
-                        showToast(`Downloading <strong>${file.name}</strong> (${file.size})…`, 'success');
-                    });
+                const downloadKey = file.location || file.name;
+                showToast(`Downloading <strong>${file.name}</strong> (${file.size})…`, 'success');
+                
+                // Trigger browser file download onto PC
+                const link = document.createElement('a');
+                link.href = `/api/download?key=${encodeURIComponent(downloadKey)}`;
+                link.download = file.name;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             }
         }
 
