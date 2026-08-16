@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -21,16 +22,15 @@ import (
 	"github.com/yigithankarabulut/distributed-file-storage/store"
 )
 
-// killProcessOnPort kills any process listening on the specified port
+// killProcessOnPort kills any process listening on the specified port (Windows local dev only)
 func killProcessOnPort(port string) {
-	// Find the PID using netstat and taskkill on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
 	cmd := exec.Command("cmd", "/c", "for /f \"tokens=5\" %a in ('netstat -ano ^| findstr :"+port+"') do taskkill /PID %a /F")
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	err := cmd.Run()
 	if err != nil {
-		// Try alternative approach using PowerShell
 		cmd = exec.Command("powershell", "-command", "Get-Process -Id (Get-NetTCPConnection -LocalPort "+port+").OwningProcess | Stop-Process -Force")
-		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 		err = cmd.Run()
 		if err != nil {
 			log.Printf("Warning: Could not kill process on port %s: %v", port, err)
@@ -40,7 +40,6 @@ func killProcessOnPort(port string) {
 	} else {
 		log.Printf("Killed process on port %s", port)
 	}
-	// Give the system a moment to release the port
 	time.Sleep(500 * time.Millisecond)
 }
 
