@@ -336,16 +336,16 @@
 
         <div class="px-4 pb-4">
             <div class="card !rounded-2xl p-4 mb-3">
-                <div class="flex items-center justify-between mb-2">
+                <div class="flex justify-between items-center mb-1.5">
                     <span class="text-xs font-medium text-app2">Storage Used</span>
-                    <span class="text-xs font-semibold text-brand-500">61%</span>
+                    <span id="sidebarStoragePct" class="text-xs font-semibold text-brand-500">0%</span>
                 </div>
                 <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
                     <div id="sidebarStorageBar"
                         class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill"
                         style="width:0%"></div>
                 </div>
-                <p class="text-[11px] text-app2 mt-2">7.3 TB of 12 TB used</p>
+                <p id="sidebarStorageText" class="text-[11px] text-app2 mt-2">0 B of 400 GB used</p>
             </div>
             <p class="text-[11px] text-app2 text-center mb-3">Version 1.0.4</p>
         </div>
@@ -478,17 +478,17 @@
                         <span
                             class="text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">stable</span>
                     </div>
-                    <p class="text-2xl font-bold tracking-tight"><span id="statTotal">0</span> TB</p>
-                    <p class="text-xs text-app2 mt-1">Total Storage</p>
+                    <p class="text-2xl font-bold tracking-tight"><span id="statTotal">0 GB</span></p>
+                    <p class="text-xs text-app2 mt-1">Total Storage (GDrive + P2P)</p>
                 </div>
                 <div class="card p-5 fade-in" style="animation-delay:120ms">
                     <div class="flex items-start justify-between mb-3">
                         <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center"><i
                                 data-lucide="hard-drive" class="w-5 h-5 text-brand-500"></i></div>
                         <span
-                            class="text-[11px] font-medium text-brand-600 dark:text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded-full">+2.1%</span>
+                            class="text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">active</span>
                     </div>
-                    <p class="text-2xl font-bold tracking-tight"><span id="statUsed">0</span> TB</p>
+                    <p class="text-2xl font-bold tracking-tight"><span id="statUsed">0 B</span></p>
                     <p class="text-xs text-app2 mt-1">Used Storage</p>
                 </div>
                 <div class="card p-5 fade-in" style="animation-delay:180ms">
@@ -731,26 +731,30 @@
         fetch('/api/dashboard')
             .then(res => res.json())
             .then(data => {
-                animateCounter(document.getElementById('statTotal'), data.totalStorage || 12, { decimals: 0 });
-                animateCounter(document.getElementById('statUsed'), data.usedStorage || 7.3, { decimals: 1 });
+                const totalCap = data.totalStorage || 400;
+                const usedFormatted = data.usedStorageFormatted || (data.usedStorage ? data.usedStorage.toFixed(2) + ' GB' : '0 B');
+                const usedPct = (data.storageUsedPercent !== undefined ? data.storageUsedPercent : 0).toFixed(1);
+
+                document.getElementById('statTotal').textContent = totalCap + ' GB';
+                document.getElementById('statUsed').textContent = usedFormatted;
                 animateCounter(document.getElementById('statNodes'), data.activeNodes || 3, { decimals: 0 });
-                animateCounter(document.getElementById('statReplication'), data.replicationHealth || 99.98, { decimals: 2 });
+                animateCounter(document.getElementById('statReplication'), data.replicationHealth || 100, { decimals: 0 });
                 animateCounter(document.getElementById('activeNodesHero'), data.activeNodes || 3, { decimals: 0 });
-                animateCounter(document.getElementById('availabilityHero'), data.availability || 100, { decimals: 2 });
+                animateCounter(document.getElementById('availabilityHero'), data.availability || 100, { decimals: 0 });
+
+                document.getElementById('sidebarStorageBar').style.width = Math.max(usedPct, 0.5) + '%';
+                document.getElementById('sidebarStoragePct').textContent = usedPct + '%';
+                document.getElementById('sidebarStorageText').textContent = `${usedFormatted} of ${totalCap} GB used`;
             })
             .catch(err => {
                 console.error('Error fetching dashboard data:', err);
-                animateCounter(document.getElementById('statTotal'), 12, { decimals: 0 });
-                animateCounter(document.getElementById('statUsed'), 7.3, { decimals: 1 });
+                document.getElementById('statTotal').textContent = '400 GB';
+                document.getElementById('statUsed').textContent = '0 B';
                 animateCounter(document.getElementById('statNodes'), 3, { decimals: 0 });
-                animateCounter(document.getElementById('statReplication'), 99.98, { decimals: 2 });
+                animateCounter(document.getElementById('statReplication'), 100, { decimals: 0 });
                 animateCounter(document.getElementById('activeNodesHero'), 3, { decimals: 0 });
-                animateCounter(document.getElementById('availabilityHero'), 100, { decimals: 2 });
+                animateCounter(document.getElementById('availabilityHero'), 100, { decimals: 0 });
             });
-
-        setTimeout(() => {
-            document.getElementById('sidebarStorageBar').style.width = '61%';
-        }, 300);
 
         /* ---------------- AREA CHART ---------------- */
         const chartData = [4.1, 4.4, 4.3, 4.8, 5.1, 5.0, 5.6, 6.0, 5.9, 6.4, 6.8, 6.9, 7.1, 7.3];
@@ -864,8 +868,7 @@
             lucide.createIcons();
             while (timelineEl.children.length > 6) timelineEl.removeChild(timelineEl.lastChild);
         }
-        for (let i = 0; i < 4; i++) pushTimelineEvent();
-        setInterval(pushTimelineEvent, 4500);
+
 
         /* ---------------- SYSTEM LOGS TERMINAL ---------------- */
         const logTemplates = [
@@ -890,8 +893,9 @@
             terminal.scrollTop = terminal.scrollHeight;
             while (terminal.children.length > 40) terminal.removeChild(terminal.firstChild);
         }
-        for (let i = 0; i < 10; i++) pushLog();
-        setInterval(pushLog, 1800);
+        // pushLog() is kept for real server logs
+        // for (let i = 0; i < 10; i++) pushLog();
+        // setInterval(pushLog, 1800);
 
         /* ---------------- ACTIVE TRANSFERS ---------------- */
         const transferData = [
@@ -948,7 +952,8 @@
                 }, 900);
             });
         }
-        runTransfers();
+        // Disabled simulated runTransfers() until real upload/download jobs are connected
+        // runTransfers();
 
         /* ---------------- REFRESH CLUSTER ---------------- */
         document.getElementById('refreshClusterBtn').addEventListener('click', () => {

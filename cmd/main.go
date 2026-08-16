@@ -1,16 +1,21 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/yigithankarabulut/distributed-file-storage/api"
+	"github.com/yigithankarabulut/distributed-file-storage/config"
 	"github.com/yigithankarabulut/distributed-file-storage/crypto"
+	"github.com/yigithankarabulut/distributed-file-storage/db"
 	"github.com/yigithankarabulut/distributed-file-storage/fileserver"
 	"github.com/yigithankarabulut/distributed-file-storage/p2p"
 	"github.com/yigithankarabulut/distributed-file-storage/store"
@@ -47,7 +52,7 @@ func makeServer(listenAddr string, encryptKey []byte, nodes ...string) *fileserv
 	)
 
 	fileServerOpts := fileserver.ServerOpts{
-		EncryptKey:        encryptKey, // []byte matches the field type
+		EncryptKey:        encryptKey,
 		StorageRoot:       strings.TrimPrefix(listenAddr, ":") + "_network",
 		PathTransformFunc: store.CASPathTransformFunc,
 		Transport:         tcpTransport,
@@ -60,52 +65,75 @@ func makeServer(listenAddr string, encryptKey []byte, nodes ...string) *fileserv
 }
 
 func main() {
-	// crypto.NewEncryptionKey() returns []byte
+	cfg := config.LoadConfig()
+
 	encryptKey, err := crypto.NewEncryptionKey()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Kill any existing processes on the ports we'll use
-	killProcessOnPort("3000")
-	killProcessOnPort("4000")
-	killProcessOnPort("5000")
-	killProcessOnPort("8080") // Frontend port
+	for _, port := range append(cfg.NodePorts, cfg.HTTPPort) {
+		killProcessOnPort(port)
+	}
 
-	s1 := makeServer(":3000", encryptKey, "")
-	s2 := makeServer(":4000", encryptKey, "")
-	s3 := makeServer(":5000", encryptKey, ":3000", ":4000")
+	s1 := makeServer(":"+cfg.NodePorts[0], encryptKey, "")
+	s2 := makeServer(":"+cfg.NodePorts[1], encryptKey, "")
+	s3 := makeServer(":"+cfg.NodePorts[2], encryptKey, ":"+cfg.NodePorts[0], ":"+cfg.NodePorts[1])
 
-	go func() {
-		if err := s1.Start(); err != nil {
-			log.Printf("Failed to start server 1: %v", err)
-		}
-	}()
-	time.Sleep(1 * time.Second)
+	servers := []*fileserver.FileServer{s1, s2, s3}
+	for i, srv := range servers {
+		go func(s *fileserver.FileServer, index int) {
+			if err := s.Start(); err != nil {
+				log.Printf("Failed to start server %d: %v", index+1, err)
+			}
+		}(srv, i)
+		time.Sleep(1 * time.Second)
+	}
 
-	go func() {
-		if err := s2.Start(); err != nil {
-			log.Printf("Failed to start server 2: %v", err)
-		}
-	}()
-	time.Sleep(2 * time.Second)
+	// Connect to MySQL database
+	database := db.Connect(cfg)
 
-	go func() {
-		if err := s3.Start(); err != nil {
-			log.Printf("Failed to start server 3: %v", err)
-		}
-	}()
-	time.Sleep(2 * time.Second)
-
-	// Serve the frontend (replaces the demo loop)
+	// Serve the web frontend and API endpoints
 	webDir := filepath.Join(".", "web")
 	fs := http.FileServer(http.Dir(webDir))
 
-	app := api.New([]*fileserver.FileServer{s1, s2, s3})
+	app := api.New(servers, database)
 	mux := http.NewServeMux()
 	api.RegisterRoutes(mux, app)
 
 	mux.Handle("/", fs)
-	log.Println("Frontend running at http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", mux))
+
+	httpServer := &http.Server{
+		Addr:    ":" + cfg.HTTPPort,
+		Handler: mux,
+	}
+
+	// Graceful shutdown listener
+	stopChan := make(chan os.Signal, 1)
+	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		log.Printf("Frontend & REST API running at http://localhost:%s\n", cfg.HTTPPort)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server error: %v", err)
+		}
+	}()
+
+	<-stopChan
+	log.Println("\nShutting down NazeerDFS cluster cleanly...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := httpServer.Shutdown(ctx); err != nil {
+		log.Printf("HTTP server shutdown error: %v\n", err)
+	}
+
+	for _, s := range servers {
+		s.Stop()
+	}
+
+	log.Println("NazeerDFS cluster shutdown complete.")
 }
+

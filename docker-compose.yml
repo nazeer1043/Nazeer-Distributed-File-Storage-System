@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  nazeerdfs-cluster:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nazeerdfs-node
+    ports:
+      - "8080:8080"
+      - "3000:3000"
+      - "4000:4000"
+      - "5000:5000"
+    environment:
+      - HTTP_PORT=8080
+      - SECRET_KEY=nazeerdfs_production_secret_key_2026
+    volumes:
+      - node3000_data:/app/3000_network
+      - node4000_data:/app/4000_network
+      - node5000_data:/app/5000_network
+    restart: unless-stopped
+
+volumes:
+  node3000_data:
+  node4000_data:
+  node5000_data:

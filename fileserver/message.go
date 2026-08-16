@@ -17,3 +17,10 @@ type MessageGetFile struct {
 	Key string
 	ID  string
 }
+
+// MessageDeleteFile is a struct that contains the key of the file to delete across peers.
+type MessageDeleteFile struct {
+	Key string
+	ID  string
+}
+

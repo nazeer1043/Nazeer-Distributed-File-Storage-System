@@ -397,14 +397,14 @@
             <div class="card !rounded-2xl p-4 mb-3">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-medium text-app2">Storage Used</span>
-                    <span class="text-xs font-semibold text-brand-500">61%</span>
+                    <span id="sidebarStoragePct" class="text-xs font-semibold text-brand-500">0%</span>
                 </div>
                 <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
                     <div id="sidebarStorageBar"
                         class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill"
                         style="width:0%"></div>
                 </div>
-                <p class="text-[11px] text-app2 mt-2">7.3 TB of 12 TB used</p>
+                <p id="sidebarStorageText" class="text-[11px] text-app2 mt-2">0 B of 400 GB used</p>
             </div>
             <p class="text-[11px] text-app2 text-center mb-3">Version 1.0.4</p>
         </div>
@@ -638,7 +638,7 @@
                         </div>
                         <div class="py-1 flex justify-between">
                             <span class="text-app2">Disk Usage</span>
-                            <span id="inspectDisk" class="font-bold text-app">70% (4.2 TB / 6 TB)</span>
+                            <span id="inspectDisk" class="font-bold text-app">Live P2P Sync</span>
                         </div>
                         <div class="py-1 flex justify-between">
                             <span class="text-app2">Network Latency</span>
@@ -903,9 +903,9 @@
 
         /* ---------------- NODE TELEMETRY HOVER DATA ---------------- */
         const nodeTelemetry = {
-            'Node 3000': { ip: '192.168.1.100:3000', badge: 'LEADER', badgeClass: 'bg-brand-500/10 text-brand-500', cpu: '34%', ram: '58%', disk: '70% (4.2 TB / 6 TB)', latency: '3.2 ms', bandwidth: '180 MB/s', temp: '42°C', files: '540 Files', health: '98 / 100' },
-            'Node 4000': { ip: '192.168.1.101:4000', badge: 'MIRROR 1', badgeClass: 'bg-amber-500/10 text-amber-500', cpu: '48%', ram: '62%', disk: '52% (2.1 TB / 4 TB)', latency: '5.1 ms', bandwidth: '140 MB/s', temp: '45°C', files: '480 Files', health: '95 / 100' },
-            'Node 5000': { ip: '192.168.1.102:5000', badge: 'MIRROR 2', badgeClass: 'bg-cyan-500/10 text-cyan-500', cpu: '22%', ram: '41%', disk: '50% (1.0 TB / 2 TB)', latency: '3.9 ms', bandwidth: '210 MB/s', temp: '39°C', files: '274 Files', health: '99 / 100' }
+            'Node 3000': { ip: '127.0.0.1:3000', badge: 'LEADER', badgeClass: 'bg-brand-500/10 text-brand-500', cpu: '34%', ram: '58%', disk: 'Active P2P Sync', latency: '3.2 ms', bandwidth: '180 MB/s', temp: '42°C', files: 'Active', health: '100 / 100' },
+            'Node 4000': { ip: '127.0.0.1:4000', badge: 'MIRROR 1', badgeClass: 'bg-amber-500/10 text-amber-500', cpu: '48%', ram: '62%', disk: 'Active P2P Sync', latency: '5.1 ms', bandwidth: '140 MB/s', temp: '45°C', files: 'Active', health: '100 / 100' },
+            'Node 5000': { ip: '127.0.0.1:5000', badge: 'MIRROR 2', badgeClass: 'bg-cyan-500/10 text-cyan-500', cpu: '22%', ram: '41%', disk: 'Active P2P Sync', latency: '3.9 ms', bandwidth: '210 MB/s', temp: '39°C', files: 'Active', health: '100 / 100' }
         };
 
         function inspectNode(nodeName) {
@@ -1029,8 +1029,9 @@
             while (terminalEl.children.length > 25) terminalEl.removeChild(terminalEl.firstChild);
         }
 
-        for (let i = 0; i < 8; i++) pushLog();
-        setInterval(pushLog, 1600);
+        // pushLog() is kept for real backend logs
+        // for (let i = 0; i < 8; i++) pushLog();
+        // setInterval(pushLog, 1600);
 
         /* ---------------- LIVE TIMELINE EVENTS ---------------- */
         const eventItems = [
@@ -1057,8 +1058,9 @@
             while (timelineEl.children.length > 5) timelineEl.removeChild(timelineEl.lastChild);
         }
 
-        for (let i = 0; i < 4; i++) pushEvent();
-        setInterval(pushEvent, 3600);
+        // pushEvent() is kept for real backend infrastructure events
+        // for (let i = 0; i < 4; i++) pushEvent();
+        // setInterval(pushEvent, 3600);
 
         /* ---------------- BUTTON ACTIONS ---------------- */
         document.getElementById('triggerRebalanceBtn').addEventListener('click', () => {
@@ -1072,6 +1074,20 @@
             setTimeout(() => { icon.style.transform = 'rotate(0deg)'; }, 700);
             showToast('NOC telemetry pulse refreshed.', 'success');
         });
+
+        // Fetch Live Storage Stats from API
+        fetch('/api/dashboard')
+            .then(res => res.json())
+            .then(data => {
+                const totalCap = data.totalStorage || 400;
+                const usedFormatted = data.usedStorageFormatted || '0 B';
+                const usedPct = (data.storageUsedPercent !== undefined ? data.storageUsedPercent : 0).toFixed(1);
+
+                document.getElementById('sidebarStorageBar').style.width = Math.max(usedPct, 0.5) + '%';
+                document.getElementById('sidebarStoragePct').textContent = usedPct + '%';
+                document.getElementById('sidebarStorageText').textContent = `${usedFormatted} of ${totalCap} GB used`;
+            })
+            .catch(err => console.error('Error fetching cluster stats:', err));
     </script>
 </body>
 

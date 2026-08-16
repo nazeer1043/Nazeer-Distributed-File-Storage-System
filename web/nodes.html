@@ -407,14 +407,14 @@
             <div class="card !rounded-2xl p-4 mb-3">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-medium text-app2">Storage Used</span>
-                    <span class="text-xs font-semibold text-brand-500">61%</span>
+                    <span id="sidebarStoragePct" class="text-xs font-semibold text-brand-500">0%</span>
                 </div>
                 <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
                     <div id="sidebarStorageBar"
                         class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill"
                         style="width:0%"></div>
                 </div>
-                <p class="text-[11px] text-app2 mt-2">7.3 TB of 12 TB used</p>
+                <p id="sidebarStorageText" class="text-[11px] text-app2 mt-2">0 B of 400 GB used</p>
             </div>
             <p class="text-[11px] text-app2 text-center mb-3">Version 1.0.4</p>
         </div>
@@ -536,7 +536,7 @@
                                 <span class="text-xs text-app2">Raft Consensus Protocol Active</span>
                             </div>
                             <h3 class="text-xl md:text-2xl font-bold tracking-tight">Cluster Storage Mesh Overview</h3>
-                            <p class="text-app2 text-sm mt-1 max-w-xl">3 active nodes distributing 7.3 TB across storage pools with sub-5ms low latency read/write pipelines.</p>
+                            <p class="text-app2 text-sm mt-1 max-w-xl">3 active P2P storage nodes backed up to 400 GB Google Drive Cloud Vault.</p>
                         </div>
 
                         <!-- Metric Badges Grid -->
@@ -548,8 +548,8 @@
                             </div>
                             <div class="bg-surface2/70 rounded-2xl px-4 py-3 text-center border border-app">
                                 <p class="text-xs text-app2 mb-0.5">Total Capacity</p>
-                                <p class="text-base font-bold text-app">12 TB</p>
-                                <p class="text-[10px] text-brand-500 font-semibold">7.3 TB Used</p>
+                                <p class="text-base font-bold text-app">400 GB</p>
+                                <p class="text-[10px] text-brand-500 font-semibold"><span id="nodesHeroUsed">0 B</span> Used</p>
                             </div>
                             <div class="bg-surface2/70 rounded-2xl px-4 py-3 text-center border border-app">
                                 <p class="text-xs text-app2 mb-0.5">Avg Latency</p>
@@ -725,7 +725,7 @@
 
                         <div>
                             <div class="flex justify-between text-xs mb-1">
-                                <span class="text-app2">Disk Usage (4.2 TB / 6 TB)</span>
+                                <span class="text-app2">Disk Usage (P2P Storage Node 3000)</span>
                                 <span class="font-bold text-app">70%</span>
                             </div>
                             <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
@@ -828,7 +828,7 @@
 
                         <div>
                             <div class="flex justify-between text-xs mb-1">
-                                <span class="text-app2">Disk Usage (2.1 TB / 4 TB)</span>
+                                <span class="text-app2">Disk Usage (P2P Storage Node 4000)</span>
                                 <span class="font-bold text-app">52%</span>
                             </div>
                             <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
@@ -931,7 +931,7 @@
 
                         <div>
                             <div class="flex justify-between text-xs mb-1">
-                                <span class="text-app2">Disk Usage (1.0 TB / 2 TB)</span>
+                                <span class="text-app2">Disk Usage (P2P Storage Node 5000)</span>
                                 <span class="font-bold text-app">50%</span>
                             </div>
                             <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
@@ -1095,7 +1095,7 @@
                                 <i data-lucide="pie-chart" class="w-4 h-4 text-brand-500"></i>
                                 <h3 class="font-bold text-sm">Node Storage Allocation</h3>
                             </div>
-                            <span class="text-[11px] text-app2">7.3 TB Total</span>
+                            <span class="text-[11px] text-app2">400 GB Vault</span>
                         </div>
 
                         <div class="h-[200px] relative flex items-center justify-center">
@@ -1352,37 +1352,7 @@
         });
 
         /* ---------------- DYNAMIC METRICS SIMULATION ---------------- */
-        setInterval(() => {
-            // Fluctuate Node 3000
-            const cpu3 = Math.round(30 + Math.random() * 12);
-            const ram3 = Math.round(55 + Math.random() * 8);
-            document.getElementById('n3000CpuVal').textContent = `${cpu3}%`;
-            document.getElementById('n3000CpuBar').style.width = `${cpu3}%`;
-            document.getElementById('n3000RamVal').textContent = `${ram3}%`;
-            document.getElementById('n3000RamBar').style.width = `${ram3}%`;
-            document.getElementById('node3000Temp').textContent = Math.round(41 + Math.random() * 3);
-
-            // Fluctuate Node 4000
-            const cpu4 = Math.round(42 + Math.random() * 15);
-            const ram4 = Math.round(60 + Math.random() * 6);
-            document.getElementById('n4000CpuVal').textContent = `${cpu4}%`;
-            document.getElementById('n4000CpuBar').style.width = `${cpu4}%`;
-            document.getElementById('n4000RamVal').textContent = `${ram4}%`;
-            document.getElementById('n4000RamBar').style.width = `${ram4}%`;
-            document.getElementById('node4000Temp').textContent = Math.round(44 + Math.random() * 3);
-
-            // Fluctuate Node 5000
-            const cpu5 = Math.round(20 + Math.random() * 10);
-            const ram5 = Math.round(38 + Math.random() * 8);
-            document.getElementById('n5000CpuVal').textContent = `${cpu5}%`;
-            document.getElementById('n5000CpuBar').style.width = `${cpu5}%`;
-            document.getElementById('n5000RamVal').textContent = `${ram5}%`;
-            document.getElementById('n5000RamBar').style.width = `${ram5}%`;
-            document.getElementById('node5000Temp').textContent = Math.round(38 + Math.random() * 3);
-
-            const avgLoad = Math.round((cpu3 + cpu4 + cpu5) / 3);
-            document.getElementById('avgClusterLoad').textContent = avgLoad;
-        }, 2200);
+        // Disabled simulated metrics fluctuation until real /api/nodes telemetry is connected
 
         /* ---------------- LIVE EVENTS TIMELINE ---------------- */
         const eventTemplates = [
@@ -1424,8 +1394,9 @@
             }
         }
 
-        for (let i = 0; i < 4; i++) pushClusterEvent();
-        setInterval(pushClusterEvent, 4000);
+        // pushClusterEvent() is kept for real backend events
+        // for (let i = 0; i < 4; i++) pushClusterEvent();
+        // setInterval(pushClusterEvent, 4000);
 
         /* ---------------- STORAGE DONUT CHART ---------------- */
         let donutChart = null;
@@ -1477,7 +1448,22 @@
                 }
             });
         }
-        initDonutChart();
+        // Fetch Live Storage Stats from API
+        fetch('/api/dashboard')
+            .then(res => res.json())
+            .then(data => {
+                const totalCap = data.totalStorage || 400;
+                const usedFormatted = data.usedStorageFormatted || '0 B';
+                const usedPct = (data.storageUsedPercent !== undefined ? data.storageUsedPercent : 0).toFixed(1);
+
+                document.getElementById('sidebarStorageBar').style.width = Math.max(usedPct, 0.5) + '%';
+                document.getElementById('sidebarStoragePct').textContent = usedPct + '%';
+                document.getElementById('sidebarStorageText').textContent = `${usedFormatted} of ${totalCap} GB used`;
+
+                const heroUsed = document.getElementById('nodesHeroUsed');
+                if (heroUsed) heroUsed.textContent = usedFormatted;
+            })
+            .catch(err => console.error('Error fetching nodes stats:', err));
     </script>
 </body>
 

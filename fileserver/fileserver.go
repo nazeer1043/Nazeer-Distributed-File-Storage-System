@@ -30,10 +30,12 @@ type ServerOpts struct {
 type FileServer struct {
 	ServerOpts
 
-	peerLock sync.Mutex
+	peerLock sync.RWMutex
 	peers    map[string]p2p.Peer
 
 	Storage  *store.Store
+	Metadata *MetadataStore
+	GDrive   *store.GDriveStore
 	doneChan chan struct{}
 }
 
@@ -48,9 +50,18 @@ func NewFileServer(opts ServerOpts) *FileServer {
 		opts.ID = crypto.GenerateID()
 	}
 
+	metaStore, err := NewMetadataStore(opts.StorageRoot)
+	if err != nil {
+		log.Printf("[%s] warning: failed to initialize metadata store: %v\n", opts.ListenAddr, err)
+	}
+
+	gdriveStore := store.NewGDriveStore("credentials.json", "NazeerDFS_Vault")
+
 	return &FileServer{
 		ServerOpts: opts,
 		Storage:    s,
+		Metadata:   metaStore,
+		GDrive:     gdriveStore,
 		doneChan:   make(chan struct{}),
 		peers:      make(map[string]p2p.Peer),
 	}
@@ -83,9 +94,33 @@ func (s *FileServer) OnPeer(p p2p.Peer) error {
 
 	s.peers[p.RemoteAddr().String()] = p
 
-	log.Printf("connected with remote: %s\n", p.RemoteAddr())
+	log.Printf("[%s] connected with remote peer: %s\n", s.Transport.Addr(), p.RemoteAddr())
 
 	return nil
+}
+
+func (s *FileServer) getPeer(addr string) (p2p.Peer, bool) {
+	s.peerLock.RLock()
+	defer s.peerLock.RUnlock()
+	peer, ok := s.peers[addr]
+	return peer, ok
+}
+
+func (s *FileServer) getPeers() []p2p.Peer {
+	s.peerLock.RLock()
+	defer s.peerLock.RUnlock()
+
+	list := make([]p2p.Peer, 0, len(s.peers))
+	for _, p := range s.peers {
+		list = append(list, p)
+	}
+	return list
+}
+
+func (s *FileServer) removePeer(addr string) {
+	s.peerLock.Lock()
+	defer s.peerLock.Unlock()
+	delete(s.peers, addr)
 }
 
 // Get gets the data from the file server.
@@ -110,14 +145,15 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 		return nil, err
 	}
 
-	time.Sleep(time.Millisecond * 500)
+	time.Sleep(time.Millisecond * 100)
 
-	for _, peer := range s.peers {
-		// First read the file size, so we can limit the amount of bytes that we read
-		// from the connection, so it will not keep hanging.
+	peers := s.getPeers()
+	var fetchedOverP2P bool
+	for _, peer := range peers {
 		var fileSize int64
 		if err := binary.Read(peer, binary.LittleEndian, &fileSize); err != nil {
-			return nil, err
+			log.Printf("[%s] peer read error from (%s): %v\n", s.Transport.Addr(), peer.RemoteAddr(), err)
+			continue
 		}
 
 		n, err := s.Storage.WriteDecrypt(
@@ -127,12 +163,30 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 			io.LimitReader(peer, fileSize),
 		)
 		if err != nil {
-			return nil, err
+			log.Printf("[%s] decrypt write error from (%s): %v\n", s.Transport.Addr(), peer.RemoteAddr(), err)
+			continue
 		}
 
 		log.Printf("[%s] received (%d) bytes over the network from (%s)\n", s.Transport.Addr(), n, peer.RemoteAddr())
-
 		peer.CloseStream()
+		fetchedOverP2P = true
+		break
+	}
+
+	if !fetchedOverP2P && s.GDrive != nil && s.GDrive.Enabled {
+		log.Printf("[%s] checking Google Drive 400GB Cloud Backup for key (%s)...\n", s.Transport.Addr(), key)
+		gdriveStream, gdriveErr := s.GDrive.DownloadFile(key)
+		if gdriveErr == nil {
+			n, writeErr := s.Storage.WriteDecrypt(s.EncryptKey, s.ID, key, gdriveStream)
+			_ = gdriveStream.Close()
+			if writeErr == nil {
+				log.Printf("[%s] restored file (%s) [%d bytes] from Google Drive Cloud Backup!\n", s.Transport.Addr(), key, n)
+			} else {
+				log.Printf("[%s] GDrive decrypt write error: %v\n", s.Transport.Addr(), writeErr)
+			}
+		} else {
+			log.Printf("[%s] GDrive download lookup error: %v\n", s.Transport.Addr(), gdriveErr)
+		}
 	}
 
 	_, r, err := s.Storage.Read(s.ID, key)
@@ -166,24 +220,74 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 
 	time.Sleep(time.Millisecond * 5)
 
-	peers := make([]io.Writer, 0, len(s.peers))
-	for _, peer := range s.peers {
-		peers = append(peers, peer)
+	peers := s.getPeers()
+	if len(peers) == 0 {
+		log.Printf("[%s] written (%d) bytes locally (no remote peers connected)\n", s.Transport.Addr(), size)
+		return nil
 	}
 
-	mw := io.MultiWriter(peers...)
-	if _, err = mw.Write([]byte{p2p.IncomingStream}); err != nil {
-		return err
+	writers := make([]io.Writer, 0, len(peers))
+	for _, peer := range peers {
+		writers = append(writers, peer)
 	}
+
+	mw := io.MultiWriter(writers...)
+	_, _ = mw.Write([]byte{p2p.IncomingStream})
 
 	n, err := crypto.CopyEncrypt(s.EncryptKey, fileBuffer, mw)
 	if err != nil {
-		return err
+		log.Printf("[%s] warning: peer replication error: %v (file stored locally and queued for GDrive)\n", s.Transport.Addr(), err)
+	} else {
+		log.Printf("[%s] written (%d) bytes locally and replicated to %d peers\n", s.Transport.Addr(), n, len(peers))
 	}
 
-	log.Printf("[%s] received and written (%d) bytes to disk: ", s.Transport.Addr(), n)
-
 	return nil
+}
+
+// StoreWithMeta stores file contents via Store and records persistent FileMeta metadata.
+func (s *FileServer) StoreWithMeta(key string, filename string, owner string, contentType string, r io.Reader) (*FileMeta, error) {
+	// Read full payload into memory so it can be written locally, replicated over P2P, and backed up to GDrive
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read upload payload: %w", err)
+	}
+
+	if err := s.Store(key, bytes.NewReader(data)); err != nil {
+		return nil, err
+	}
+
+	peers := s.getPeers()
+	meta := &FileMeta{
+		Key:         key,
+		Filename:    filename,
+		Size:        int64(len(data)),
+		ContentType: contentType,
+		Owner:       owner,
+		Checksum:    crypto.HashKey(key),
+		UploadTime:  time.Now(),
+		NodeID:      s.ListenAddr,
+		Replicas:    len(peers) + 1,
+	}
+
+	if s.Metadata != nil {
+		if err := s.Metadata.Put(meta); err != nil {
+			log.Printf("[%s] warning: failed to write file metadata: %v\n", s.ListenAddr, err)
+		}
+	}
+
+	if s.GDrive != nil && s.GDrive.Enabled {
+		// Encrypt and upload payload asynchronously to Google Drive 400GB Cloud Backup Tier
+		go func(k, fname string, rawPayload []byte) {
+			encBuf := new(bytes.Buffer)
+			if _, encErr := crypto.CopyEncrypt(s.EncryptKey, bytes.NewReader(rawPayload), encBuf); encErr == nil {
+				_, _ = s.GDrive.UploadFile(k, fname, encBuf)
+			} else {
+				log.Printf("[%s] GDrive encryption error: %v\n", s.ListenAddr, encErr)
+			}
+		}(key, filename, data)
+	}
+
+	return meta, nil
 }
 
 func (s *FileServer) broadcast(msg *Message) error {
@@ -192,10 +296,12 @@ func (s *FileServer) broadcast(msg *Message) error {
 		return err
 	}
 
-	for _, peer := range s.peers {
+	peers := s.getPeers()
+	for _, peer := range peers {
 		_ = peer.Send([]byte{p2p.IncomingMessage})
 		if err := peer.Send(buf.Bytes()); err != nil {
-			return err
+			log.Printf("[%s] broadcast error to peer (%s): %v\n", s.Transport.Addr(), peer.RemoteAddr(), err)
+			s.removePeer(peer.RemoteAddr().String())
 		}
 	}
 
@@ -216,6 +322,7 @@ func (s *FileServer) loop() {
 			var msg Message
 			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&msg); err != nil {
 				log.Printf("gob decode error: %s\n", err.Error())
+				continue
 			}
 			if err := s.handleMessage(rpc.From.String(), &msg); err != nil {
 				log.Printf("handle message error: %s\n", err.Error())
@@ -233,6 +340,8 @@ func (s *FileServer) handleMessage(from string, msg *Message) error {
 		return s.handleMessageStoreFile(from, v)
 	case MessageGetFile:
 		return s.handleMessageGetFile(from, v)
+	case MessageDeleteFile:
+		return s.handleMessageDeleteFile(from, v)
 	}
 	return nil
 }
@@ -253,7 +362,7 @@ func (s *FileServer) handleMessageGetFile(from string, msg MessageGetFile) error
 		defer func() { _ = rc.Close() }()
 	}
 
-	peer, ok := s.peers[from]
+	peer, ok := s.getPeer(from)
 	if !ok {
 		return fmt.Errorf("peer (%s) could not be found in the peers map", from) //nolint:err113
 	}
@@ -269,13 +378,13 @@ func (s *FileServer) handleMessageGetFile(from string, msg MessageGetFile) error
 		return err
 	}
 
-	log.Printf("[%s] written (%d) bytes over the network to from %s\n", s.Transport.Addr(), n, from)
+	log.Printf("[%s] written (%d) bytes over the network to %s\n", s.Transport.Addr(), n, from)
 
 	return nil
 }
 
 func (s *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) error {
-	peer, ok := s.peers[from]
+	peer, ok := s.getPeer(from)
 	if !ok {
 		return fmt.Errorf("peer (%s) could not be found in the peers map", from) //nolint:err113
 	}
@@ -288,6 +397,20 @@ func (s *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) e
 
 	peer.CloseStream()
 
+	return nil
+}
+
+func (s *FileServer) handleMessageDeleteFile(from string, msg MessageDeleteFile) error {
+	log.Printf("[%s] received P2P delete message for key (%s)\n", s.Transport.Addr(), msg.Key)
+	_ = s.Storage.Delete(msg.ID, msg.Key)
+	if s.Metadata != nil {
+		_ = s.Metadata.Delete(msg.Key)
+	}
+	if s.GDrive != nil && s.GDrive.Enabled {
+		go func(k string) {
+			_ = s.GDrive.DeleteFile(k)
+		}(msg.Key)
+	}
 	return nil
 }
 
@@ -309,4 +432,5 @@ func (s *FileServer) bootstrapNetwork() {
 func init() {
 	gob.Register(MessageStoreFile{})
 	gob.Register(MessageGetFile{})
+	gob.Register(MessageDeleteFile{})
 }

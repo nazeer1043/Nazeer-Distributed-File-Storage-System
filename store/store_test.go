@@ -39,7 +39,10 @@ func TestDelete(t *testing.T) {
 		t.Error(err)
 	}
 
-	if _, _, err := s.Read(id, key); err == nil {
+	if _, r, err := s.Read(id, key); err == nil {
+		if rc, ok := r.(io.ReadCloser); ok {
+			_ = rc.Close()
+		}
 		t.Error("expected error, got nil")
 	}
 }
@@ -67,6 +70,10 @@ func TestStore(t *testing.T) {
 		}
 
 		b, _ := io.ReadAll(r)
+		if rc, ok := r.(io.ReadCloser); ok {
+			_ = rc.Close()
+		}
+
 		if !bytes.Equal(b, data) {
 			t.Errorf("expected %s, got %s", string(data), string(b))
 		}

@@ -348,14 +348,14 @@
             <div class="card !rounded-2xl p-4 mb-3">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-medium text-app2">Storage Used</span>
-                    <span class="text-xs font-semibold text-brand-500">61%</span>
+                    <span id="sidebarStoragePct" class="text-xs font-semibold text-brand-500">0%</span>
                 </div>
                 <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
                     <div id="sidebarStorageBar"
                         class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill"
                         style="width:0%"></div>
                 </div>
-                <p class="text-[11px] text-app2 mt-2">7.3 TB of 12 TB used</p>
+                <p id="sidebarStorageText" class="text-[11px] text-app2 mt-2">0 B of 400 GB used</p>
             </div>
             <p class="text-[11px] text-app2 text-center mb-3">Version 1.0.4</p>
         </div>
@@ -488,10 +488,10 @@
                         <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center">
                             <i data-lucide="hard-drive" class="w-5 h-5 text-brand-500"></i>
                         </div>
-                        <span class="text-[11px] font-medium text-brand-500 bg-brand-500/10 px-2 py-0.5 rounded-full">61% Quota</span>
+                        <span id="statQuotaBadge" class="text-[11px] font-medium text-brand-500 bg-brand-500/10 px-2 py-0.5 rounded-full">0% Quota</span>
                     </div>
-                    <p class="text-2xl font-bold tracking-tight"><span id="statSize">0</span> TB</p>
-                    <p class="text-xs text-app2 mt-1">Total Cluster Volume</p>
+                    <p class="text-2xl font-bold tracking-tight"><span id="statSize">0 B</span></p>
+                    <p class="text-xs text-app2 mt-1">Total Used Volume (GDrive Vault)</p>
                 </div>
 
                 <div class="card p-5 fade-in" style="animation-delay:180ms">
@@ -653,21 +653,21 @@
                                     <span class="w-2 h-2 rounded-full bg-brand-500"></span>
                                     <span class="text-[11px] font-semibold">Node 3000</span>
                                 </div>
-                                <p class="text-xs font-bold text-app">4.2 TB</p>
+                                <p class="text-xs font-bold text-emerald-500">Active</p>
                             </div>
                             <div class="p-2 rounded-xl bg-surface2/60">
                                 <div class="flex items-center justify-center gap-1.5 mb-0.5">
                                     <span class="w-2 h-2 rounded-full bg-amber-500"></span>
                                     <span class="text-[11px] font-semibold">Node 4000</span>
                                 </div>
-                                <p class="text-xs font-bold text-app">2.1 TB</p>
+                                <p class="text-xs font-bold text-emerald-500">Active</p>
                             </div>
                             <div class="p-2 rounded-xl bg-surface2/60">
                                 <div class="flex items-center justify-center gap-1.5 mb-0.5">
                                     <span class="w-2 h-2 rounded-full bg-cyan-500"></span>
                                     <span class="text-[11px] font-semibold">Node 5000</span>
                                 </div>
-                                <p class="text-xs font-bold text-app">1.0 TB</p>
+                                <p class="text-xs font-bold text-emerald-500">Active</p>
                             </div>
                         </div>
                     </div>
@@ -1763,29 +1763,9 @@
             }
         }
 
-        // Initialize 4 initial activity entries
-        for (let i = 0; i < 4; i++) pushActivityLog();
-        setInterval(pushActivityLog, 4500);
 
-        /* ---------------- UPLOAD QUEUE ANIMATED PROGRESS ---------------- */
-        let uploadProgress = 74;
-        const queueProgressBar = document.getElementById('queueProgressBar');
-        const queueProgressPct = document.getElementById('queueProgressPct');
-        const queueSpeed = document.getElementById('queueSpeed');
-        const queueEta = document.getElementById('queueEta');
 
-        setInterval(() => {
-            uploadProgress += Math.random() * 6 + 2;
-            if (uploadProgress >= 100) {
-                uploadProgress = 12;
-                showToast('Upload <strong>enterprise-architecture-2026.iso</strong> completed!', 'success');
-            }
-            queueProgressBar.style.width = `${Math.round(uploadProgress)}%`;
-            queueProgressPct.textContent = `${Math.round(uploadProgress)}%`;
-            queueSpeed.textContent = `${(120 + Math.random() * 15).toFixed(1)} MB/s`;
-            const remSec = Math.max(1, Math.round((100 - uploadProgress) / 7));
-            queueEta.textContent = `${remSec}s remaining`;
-        }, 1200);
+
 
         // Initial render & fetch from API
         fetch('/api/files')

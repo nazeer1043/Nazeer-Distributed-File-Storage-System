@@ -14,3 +14,11 @@
 /out/
 go.work
 /bin/
+
+# Temporary Local CAS Network Stores
+*_network/
+store/store/
+
+# Secret API Keys & OAuth Tokens (Render Secret Environment)
+credentials.json
+token.json

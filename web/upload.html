@@ -388,14 +388,14 @@
             <div class="card !rounded-2xl p-4 mb-3">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-medium text-app2">Storage Used</span>
-                    <span class="text-xs font-semibold text-brand-500">61%</span>
+                    <span id="sidebarStoragePct" class="text-xs font-semibold text-brand-500">0%</span>
                 </div>
                 <div class="w-full h-2 rounded-full bg-surface2 overflow-hidden">
                     <div id="sidebarStorageBar"
                         class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill"
                         style="width:0%"></div>
                 </div>
-                <p class="text-[11px] text-app2 mt-2">7.3 TB of 12 TB used</p>
+                <p id="sidebarStorageText" class="text-[11px] text-app2 mt-2">0 B of 400 GB used</p>
             </div>
             <p class="text-[11px] text-app2 text-center mb-3">Version 1.0.4</p>
         </div>
@@ -546,8 +546,8 @@
                             </div>
                             <div
                                 class="bg-surface2/70 rounded-2xl px-4 py-3 text-center border border-app col-span-2 sm:col-span-1">
-                                <p class="text-xs text-app2 mb-0.5">Remaining</p>
-                                <p class="text-lg font-bold text-app">4.7 TB</p>
+                                <p class="text-xs text-app2 mb-0.5">Cloud Vault</p>
+                                <p id="heroRemaining" class="text-lg font-bold text-app">400 GB</p>
                             </div>
                         </div>
                     </div>
@@ -562,11 +562,10 @@
                             <i data-lucide="file-up" class="w-5 h-5 text-brand-500"></i>
                         </div>
                         <span
-                            class="text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">+18
-                            Today</span>
+                            class="text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">active</span>
                     </div>
                     <p class="text-2xl font-bold tracking-tight"><span id="statUploadsCount">0</span> Files</p>
-                    <p class="text-xs text-app2 mt-1">Today's Uploads</p>
+                    <p class="text-xs text-app2 mt-1">Total Stored Files</p>
                 </div>
 
                 <div class="card p-5 fade-in" style="animation-delay:180ms">
@@ -575,8 +574,7 @@
                             <i data-lucide="zap" class="w-5 h-5 text-brand-500"></i>
                         </div>
                         <span
-                            class="text-[11px] font-medium text-brand-500 bg-brand-500/10 px-2 py-0.5 rounded-full">Peak
-                            142 MB/s</span>
+                            class="text-[11px] font-medium text-brand-500 bg-brand-500/10 px-2 py-0.5 rounded-full">Peak 142 MB/s</span>
                     </div>
                     <p class="text-2xl font-bold tracking-tight"><span id="statAvgSpeed">0</span> MB/s</p>
                     <p class="text-xs text-app2 mt-1">Average Upload Speed</p>
@@ -588,11 +586,10 @@
                             <i data-lucide="database" class="w-5 h-5 text-brand-500"></i>
                         </div>
                         <span
-                            class="text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">3
-                            Nodes</span>
+                            class="text-[11px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">3 Nodes</span>
                     </div>
-                    <p class="text-2xl font-bold tracking-tight"><span id="statDataUploaded">0</span> TB</p>
-                    <p class="text-xs text-app2 mt-1">Data Uploaded Today</p>
+                    <p class="text-2xl font-bold tracking-tight"><span id="statDataUploaded">0 B</span></p>
+                    <p class="text-xs text-app2 mt-1">Total Storage Volume</p>
                 </div>
 
                 <div class="card p-5 fade-in" style="animation-delay:300ms">
@@ -800,13 +797,13 @@
                         </div>
 
                         <div class="w-full h-3 rounded-full bg-surface2 overflow-hidden mb-2 relative">
-                            <div class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill"
-                                style="width: 61%"></div>
+                            <div id="storagePoolBar" class="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full progress-fill"
+                                style="width: 0.1%"></div>
                         </div>
 
                         <div class="flex justify-between text-xs text-app2 font-mono">
-                            <span>7.3 TB Used</span>
-                            <span>4.7 TB Free</span>
+                            <span><span id="poolUsedText">0 B</span> Used</span>
+                            <span><span id="poolFreeText">400 GB</span> Free</span>
                         </div>
                     </div>
 
@@ -1033,12 +1030,7 @@
             }, 3200);
         }
 
-        /* ---------------- UPLOAD QUEUE DATA & LOGIC ---------------- */
-        let queueData = [
-            { id: 'q1', name: 'presentation-final.pptx', size: '3.2 GB', totalMB: 3200, progress: 68, speed: 45, eta: '2 min remaining', node: 'Node 3000', nodeBadge: 'text-brand-500 bg-brand-500/10', replicas: '3/3 Replicas', paused: false, icon: 'presentation', color: 'text-orange-500' },
-            { id: 'q2', name: 'financial-audit-2026.zip', size: '1.4 GB', totalMB: 1400, progress: 34, speed: 38, eta: '3 min remaining', node: 'Node 4000', nodeBadge: 'text-amber-500 bg-amber-500/10', replicas: '2/3 Replicas', paused: false, icon: 'archive', color: 'text-amber-500' },
-            { id: 'q3', name: 'product-demo-4k.mp4', size: '4.8 GB', rawMB: 4800, progress: 12, speed: 52, eta: '4 min remaining', node: 'Node 3000', nodeBadge: 'text-brand-500 bg-brand-500/10', replicas: '1/3 Replicas', paused: false, icon: 'video', color: 'text-purple-500' }
-        ];
+        let queueData = [];
 
         function renderQueue() {
             const listEl = document.getElementById('queueList');
@@ -1130,29 +1122,7 @@
             showToast('Cleared completed items from queue.', 'info');
         });
 
-        // Simulate Progress Updates
-        setInterval(() => {
-            let updated = false;
-            queueData.forEach(item => {
-                // Only update if not paused and not already complete
-                if (!item.paused && item.progress < 100) {
-                    item.progress += Math.random() * 4 + 1.5;
-                    item.speed = (40 + Math.random() * 15).toFixed(1);
-                    const remMB = (item.totalMB || 3000) * (1 - item.progress / 100);
-                    const sec = Math.max(1, Math.round(remMB / item.speed));
-                    item.eta = sec > 60 ? `${Math.round(sec / 60)} min remaining` : `${sec}s remaining`;
 
-                    if (item.progress >= 100) {
-                        item.progress = 100;
-                        item.eta = 'Complete';
-                        showToast(`Upload completed: <strong>${item.name}</strong>`, 'success');
-                        appendRecentUpload(item.name, item.size, item.node);
-                    }
-                    updated = true;
-                }
-            });
-            if (updated) renderQueue();
-        }, 1200);
         /* ---------------- RECENT UPLOADS TABLE ---------------- */
         const recentUploadsData = [
             { name: 'annual-report-2026.pdf', size: '24.8 MB', time: '10m ago', node: 'Node 3000', replicas: '3/3', status: 'Completed' },
@@ -1241,9 +1211,7 @@
             }
         }
 
-        // Initialize 4 timeline steps
-        for (let i = 0; i < 4; i++) pushTransferEvent();
-        setInterval(pushTransferEvent, 3800);
+
 
         /* ---------------- DRAG AND DROP HANDLING ---------------- */
         const dropArea = document.getElementById('dropArea');
@@ -1278,28 +1246,31 @@
 
         function handleFilesSelect(files) {
             if (files.length === 0) return;
-            Array.from(files).forEach((file, i) => {
-                const mb = (file.size / (1024 * 1024)).toFixed(1);
-                const sizeStr = file.size > 1024 * 1024 * 1024 ? `${(file.size / (1024 * 1024 * 1024)).toFixed(1)} GB` : `${mb} MB`;
-                const newItem = {
-                    id: 'q_' + Date.now() + '_' + i,
-                    name: file.name,
-                    size: sizeStr,
-                    totalMB: Math.max(50, file.size / (1024 * 1024)),
-                    progress: 5,
-                    speed: (45 + Math.random() * 10).toFixed(1),
-                    eta: 'Calculating…',
-                    node: 'Node 3000',
-                    nodeBadge: 'text-brand-500 bg-brand-500/10',
-                    replicas: '3/3 Replicas',
-                    paused: false,
-                    icon: 'file-text',
-                    color: 'text-brand-500'
-                };
-                queueData.unshift(newItem);
+            Array.from(files).forEach((file) => {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('owner', 'Admin User');
+
+                showToast(`Uploading <strong>${file.name}</strong> to NazeerDFS...`, 'info');
+
+                fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast(`Successfully uploaded <strong>${file.name}</strong> to cluster!`, 'success');
+                        appendRecentUpload(file.name, (file.size / (1024 * 1024)).toFixed(1) + ' MB', 'Node 3000');
+                    } else {
+                        showToast(`Upload failed: ${data.message}`, 'danger');
+                    }
+                })
+                .catch(err => {
+                    console.error('Upload error:', err);
+                    showToast(`Error uploading <strong>${file.name}</strong>: ${err.message || 'Server timeout or body size exceeded'}`, 'danger');
+                });
             });
-            renderQueue();
-            showToast(`Added <strong>${files.length} file(s)</strong> to cluster upload queue.`, 'success');
         }
 
         /* ---------------- TOP BUTTON LISTENERS ---------------- */
@@ -1310,6 +1281,28 @@
         document.getElementById('viewHistoryBtn').addEventListener('click', () => {
             showToast('Showing complete enterprise upload history logs.', 'info');
         });
+
+        // Fetch Live Storage Stats from API
+        fetch('/api/dashboard')
+            .then(res => res.json())
+            .then(data => {
+                const totalCap = data.totalStorage || 400;
+                const usedFormatted = data.usedStorageFormatted || '0 B';
+                const usedPct = (data.storageUsedPercent !== undefined ? data.storageUsedPercent : 0).toFixed(1);
+
+                document.getElementById('statDataUploaded').textContent = usedFormatted;
+                document.getElementById('sidebarStorageBar').style.width = Math.max(usedPct, 0.5) + '%';
+                document.getElementById('sidebarStoragePct').textContent = usedPct + '%';
+                document.getElementById('sidebarStorageText').textContent = `${usedFormatted} of ${totalCap} GB used`;
+
+                const poolBar = document.getElementById('storagePoolBar');
+                if (poolBar) poolBar.style.width = Math.max(usedPct, 0.5) + '%';
+                const poolUsed = document.getElementById('poolUsedText');
+                if (poolUsed) poolUsed.textContent = usedFormatted;
+                const poolFree = document.getElementById('poolFreeText');
+                if (poolFree) poolFree.textContent = `${(totalCap - (data.usedStorage || 0)).toFixed(1)} GB`;
+            })
+            .catch(err => console.error('Error fetching upload stats:', err));
 
         // Initialize Render
         renderQueue();
