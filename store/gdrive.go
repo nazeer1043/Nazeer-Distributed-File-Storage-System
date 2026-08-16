@@ -43,8 +43,12 @@ func NewGDriveStore(credentialsPath string, vaultFolderName string) *GDriveStore
 
 	credsBytes, err := os.ReadFile(credentialsPath)
 	if err != nil {
-		log.Printf("[GDrive] Notice: '%s' not found in project root. Cloud backup tier running in disabled mode until credentials.json is provided.\n", credentialsPath)
-		return gs
+		if envCreds := os.Getenv("CREDENTIALS_JSON"); envCreds != "" {
+			credsBytes = []byte(envCreds)
+		} else {
+			log.Printf("[GDrive] Notice: '%s' not found in project root. Cloud backup tier running in disabled mode until credentials.json is provided.\n", credentialsPath)
+			return gs
+		}
 	}
 
 	ctx := context.Background()
@@ -133,6 +137,12 @@ func getOAuthClient(ctx context.Context, credsBytes []byte) (*http.Client, error
 }
 
 func tokenFromFile(file string) (*oauth2.Token, error) {
+	if envTok := os.Getenv("TOKEN_JSON"); envTok != "" {
+		tok := &oauth2.Token{}
+		if err := json.Unmarshal([]byte(envTok), tok); err == nil {
+			return tok, nil
+		}
+	}
 	f, err := os.Open(file)
 	if err != nil {
 		return nil, err
