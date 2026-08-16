@@ -22,8 +22,6 @@ RUN apk --no-cache add ca-certificates tzdata
 
 COPY --from=builder /nazeerdfs /app/nazeerdfs
 COPY --from=builder /app/web /app/web
-COPY credentials.json* /app/
-COPY token.json* /app/
 
 EXPOSE 8080 3000 4000 5000
 
