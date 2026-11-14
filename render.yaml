@@ -4,6 +4,9 @@ services:
     runtime: docker
     plan: free
     region: singapore
+    healthCheckPath: /healthz
     envVars:
       - key: PORT
         value: 8080
+      - key: APP_ENV
+        value: production
