@@ -26,9 +26,9 @@ func init() {
 	gdriveStore := store.NewGDriveStore("credentials.json", store.DefaultVaultFolderName)
 
 	tmpDir := os.TempDir()
-	s1 := makeServerNode(filepath.Join(tmpDir, "3000_network"), encryptKey, gdriveStore)
-	s2 := makeServerNode(filepath.Join(tmpDir, "4000_network"), encryptKey, gdriveStore)
-	s3 := makeServerNode(filepath.Join(tmpDir, "5000_network"), encryptKey, gdriveStore)
+	s1 := makeServerNode(":3000", filepath.Join(tmpDir, "3000_network"), encryptKey, gdriveStore)
+	s2 := makeServerNode(":4000", filepath.Join(tmpDir, "4000_network"), encryptKey, gdriveStore)
+	s3 := makeServerNode(":5000", filepath.Join(tmpDir, "5000_network"), encryptKey, gdriveStore)
 
 	servers := []*fileserver.FileServer{s1, s2, s3}
 	database := db.Connect(cfg)
@@ -38,7 +38,7 @@ func init() {
 	api.RegisterRoutes(muxInstance, appInstance)
 }
 
-func makeServerNode(storageRoot string, encryptKey []byte, gdriveStore *store.GDriveStore) *fileserver.FileServer {
+func makeServerNode(listenAddr string, storageRoot string, encryptKey []byte, gdriveStore *store.GDriveStore) *fileserver.FileServer {
 	tcpTransport := p2p.NewTCPTransport(
 		p2p.WithListenAddr(":0"),
 		p2p.WithHandshakeFunc(p2p.NOPHandshakeFunc),
@@ -46,6 +46,7 @@ func makeServerNode(storageRoot string, encryptKey []byte, gdriveStore *store.GD
 	)
 
 	fileServerOpts := fileserver.ServerOpts{
+		ListenAddr:        listenAddr,
 		EncryptKey:        encryptKey,
 		StorageRoot:       storageRoot,
 		PathTransformFunc: store.CASPathTransformFunc,
