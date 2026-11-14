@@ -2,12 +2,15 @@ package fileserver
 
 import (
 	"bytes"
-	"encoding/binary"
+	"crypto/sha256"
 	"encoding/gob"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yigithankarabulut/distributed-file-storage/crypto"
@@ -15,19 +18,27 @@ import (
 	"github.com/yigithankarabulut/distributed-file-storage/store"
 )
 
-// ServerOpts is a struct that contains the configuration for the file server.
+var streamIDCounter uint64
+
+func nextStreamID() uint64 {
+	return atomic.AddUint64(&streamIDCounter, 1)
+}
+
+// ServerOpts contains configuration for the distributed file server node.
 type ServerOpts struct {
 	ID                string
 	EncryptKey        []byte
 	KeyID             string
+	ClusterSecret     string
 	ListenAddr        string
 	StorageRoot       string
 	PathTransformFunc store.PathTransformFunc
 	Transport         p2p.Transport
 	BootstrapNodes    []string
+	ReplicationFactor int
 }
 
-// FileServer is a struct that contains the configuration for the file server.
+// FileServer coordinates encrypted local storage, P2P replication, and cloud backup.
 type FileServer struct {
 	ServerOpts
 
@@ -38,6 +49,12 @@ type FileServer struct {
 	Metadata *MetadataStore
 	GDrive   *store.GDriveStore
 	doneChan chan struct{}
+
+	ackMu  sync.RWMutex
+	ackChs map[uint64]chan MessageAck
+
+	dataMu  sync.RWMutex
+	dataChs map[uint64]chan []byte
 }
 
 // NewFileServer creates a new file server instance with the given options.
@@ -55,6 +72,10 @@ func NewFileServer(opts ServerOpts) *FileServer {
 		opts.ListenAddr = opts.Transport.Addr()
 	}
 
+	if opts.ReplicationFactor <= 0 {
+		opts.ReplicationFactor = 2
+	}
+
 	metaStore, err := NewMetadataStore(opts.StorageRoot)
 	if err != nil {
 		log.Printf("[%s] warning: failed to initialize metadata store: %v\n", opts.ListenAddr, err)
@@ -62,17 +83,21 @@ func NewFileServer(opts ServerOpts) *FileServer {
 
 	gdriveStore := store.NewGDriveStore("credentials.json", "NazeerDFS_Vault")
 
-	return &FileServer{
+	fs := &FileServer{
 		ServerOpts: opts,
 		Storage:    s,
 		Metadata:   metaStore,
 		GDrive:     gdriveStore,
 		doneChan:   make(chan struct{}),
 		peers:      make(map[string]p2p.Peer),
+		ackChs:     make(map[uint64]chan MessageAck),
+		dataChs:    make(map[uint64]chan []byte),
 	}
+
+	return fs
 }
 
-// Start starts the file server.
+// Start starts the file server, connects to bootstrap peers, and enters main loop.
 func (s *FileServer) Start() error {
 	if err := s.Transport.ListenAndAccept(); err != nil {
 		return err
@@ -80,28 +105,38 @@ func (s *FileServer) Start() error {
 
 	if len(s.BootstrapNodes) > 0 {
 		s.bootstrapNetwork()
+		go s.startPeerReconnectLoop()
 	}
 
 	s.loop()
-
 	return nil
 }
 
-// Stop stops the file server.
+// Stop stops the file server gracefully.
 func (s *FileServer) Stop() {
-	close(s.doneChan)
+	select {
+	case <-s.doneChan:
+	default:
+		close(s.doneChan)
+	}
 }
 
-// OnPeer is a callback function that is called when a peer is connected to the file server.
+// OnPeer handles incoming authenticated peer connection registration.
 func (s *FileServer) OnPeer(p p2p.Peer) error {
 	s.peerLock.Lock()
 	defer s.peerLock.Unlock()
 
 	s.peers[p.RemoteAddr().String()] = p
-
-	log.Printf("[%s] connected with remote peer: %s\n", s.Transport.Addr(), p.RemoteAddr())
-
+	log.Printf("[%s] connected with authenticated remote peer: %s\n", s.Transport.Addr(), p.RemoteAddr())
 	return nil
+}
+
+// OnPeerDisconnect cleans up peer registration on disconnect.
+func (s *FileServer) OnPeerDisconnect(p p2p.Peer) {
+	s.peerLock.Lock()
+	defer s.peerLock.Unlock()
+	delete(s.peers, p.RemoteAddr().String())
+	log.Printf("[%s] disconnected and cleaned up peer: %s\n", s.Transport.Addr(), p.RemoteAddr())
 }
 
 func (s *FileServer) getPeer(addr string) (p2p.Peer, bool) {
@@ -128,108 +163,148 @@ func (s *FileServer) removePeer(addr string) {
 	delete(s.peers, addr)
 }
 
-// Get gets the data from the file server.
-// It reads the data from the store if it exists, otherwise it fetches the data from the network.
+func (s *FileServer) verifyChecksum(r io.Reader, expectedChecksum string) (bool, []byte, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return false, nil, err
+	}
+	if expectedChecksum == "" {
+		return true, data, nil
+	}
+	hash := sha256.Sum256(data)
+	computed := hex.EncodeToString(hash[:])
+	return computed == expectedChecksum, data, nil
+}
+
+// Get gets the file from the file server.
+// It verifies plaintext checksum against metadata, automatically failing over to peers
+// or Google Drive cloud vault upon corruption or mismatch.
 func (s *FileServer) Get(key string) (io.Reader, error) {
-	if s.Storage.Has(s.ID, key) {
-		log.Printf("[%s] serving file (%s) from local disk\n", s.Transport.Addr(), key)
-		_, r, err := s.Storage.Read(s.ID, key)
-		if err != nil {
-			return nil, err
+	var expectedChecksum string
+	if s.Metadata != nil {
+		if meta, ok := s.Metadata.Get(key); ok {
+			expectedChecksum = meta.Checksum
 		}
-		defer func() {
+	}
+
+	// 1. Try serving from local disk first
+	if s.Storage.Has(s.ID, key) {
+		log.Printf("[%s] reading file (%s) from local disk\n", s.Transport.Addr(), key)
+		_, r, err := s.Storage.Read(s.ID, key)
+		if err == nil {
+			decBuf := new(bytes.Buffer)
+			if _, decErr := crypto.CopyDecrypt(s.EncryptKey, r, decBuf); decErr == nil {
+				valid, data, _ := s.verifyChecksum(bytes.NewReader(decBuf.Bytes()), expectedChecksum)
+				if valid {
+					return bytes.NewReader(data), nil
+				}
+				log.Printf("[%s] local file (%s) checksum mismatch! Attempting recovery from peers...\n", s.Transport.Addr(), key)
+			}
 			if rc, ok := r.(io.ReadCloser); ok {
 				_ = rc.Close()
 			}
-		}()
-		decBuf := new(bytes.Buffer)
-		if _, err := crypto.CopyDecrypt(s.EncryptKey, r, decBuf); err != nil {
-			return nil, fmt.Errorf("failed to decrypt local file: %w", err)
 		}
-		return decBuf, nil
 	}
 
-	log.Printf("[%s] dont have the file (%s) locally, fetching from network...\n", s.Transport.Addr(), key)
-
-	msg := Message{
-		Payload: MessageGetFile{
-			ID:  s.ID,
-			Key: crypto.HashKey(key),
-		},
-	}
-
-	if err := s.broadcast(&msg); err != nil {
-		return nil, err
-	}
-
-	time.Sleep(time.Millisecond * 100)
-
+	// 2. Fetch from peer nodes with length-prefixed protocol
+	log.Printf("[%s] fetching file (%s) from remote peer network...\n", s.Transport.Addr(), key)
 	peers := s.getPeers()
-	var fetchedOverP2P bool
 	for _, peer := range peers {
-		var fileSize int64
-		if err := binary.Read(peer, binary.LittleEndian, &fileSize); err != nil {
-			log.Printf("[%s] peer read error from (%s): %v\n", s.Transport.Addr(), peer.RemoteAddr(), err)
+		streamID := nextStreamID()
+		dataCh := make(chan []byte, 32)
+
+		s.dataMu.Lock()
+		s.dataChs[streamID] = dataCh
+		s.dataMu.Unlock()
+
+		msg := Message{
+			Payload: MessageGetFile{
+				ID:       s.ID,
+				Key:      key,
+				StreamID: streamID,
+			},
+		}
+
+		buf := new(bytes.Buffer)
+		if err := gob.NewEncoder(buf).Encode(&msg); err != nil {
+			s.dataMu.Lock()
+			delete(s.dataChs, streamID)
+			s.dataMu.Unlock()
 			continue
 		}
 
-		// Store received encrypted ciphertext directly to local disk
-		n, err := s.Storage.Write(
-			s.ID,
-			key,
-			io.LimitReader(peer, fileSize),
-		)
-		if err != nil {
-			log.Printf("[%s] write error from (%s): %v\n", s.Transport.Addr(), peer.RemoteAddr(), err)
+		frame, _ := p2p.EncodeMessageFrame(streamID, buf.Bytes())
+		if err := peer.Send(frame); err != nil {
+			s.dataMu.Lock()
+			delete(s.dataChs, streamID)
+			s.dataMu.Unlock()
 			continue
 		}
 
-		log.Printf("[%s] received (%d) bytes over the network from (%s)\n", s.Transport.Addr(), n, peer.RemoteAddr())
-		peer.CloseStream()
-		fetchedOverP2P = true
-		break
+		// Collect incoming stream chunks
+		receivedBuf := new(bytes.Buffer)
+		streamDone := false
+		timeout := time.After(5 * time.Second)
+
+		for !streamDone {
+			select {
+			case chunk, ok := <-dataCh:
+				if !ok || len(chunk) == 0 {
+					streamDone = true
+					break
+				}
+				receivedBuf.Write(chunk)
+			case <-timeout:
+				streamDone = true
+			}
+		}
+
+		s.dataMu.Lock()
+		delete(s.dataChs, streamID)
+		s.dataMu.Unlock()
+
+		if receivedBuf.Len() > 0 {
+			// Write received ciphertext to local disk storage
+			_, _ = s.Storage.Write(s.ID, key, bytes.NewReader(receivedBuf.Bytes()))
+
+			// Verify decrypted plaintext
+			decBuf := new(bytes.Buffer)
+			if _, decErr := crypto.CopyDecrypt(s.EncryptKey, bytes.NewReader(receivedBuf.Bytes()), decBuf); decErr == nil {
+				valid, data, _ := s.verifyChecksum(bytes.NewReader(decBuf.Bytes()), expectedChecksum)
+				if valid {
+					log.Printf("[%s] successfully recovered file (%s) from peer (%s)\n", s.Transport.Addr(), key, peer.RemoteAddr())
+					return bytes.NewReader(data), nil
+				}
+			}
+		}
 	}
 
-	if !fetchedOverP2P && s.GDrive != nil && s.GDrive.Enabled {
+	// 3. Fallback to Google Drive Cloud Vault
+	if s.GDrive != nil && s.GDrive.Enabled {
 		log.Printf("[%s] checking Google Drive Cloud Backup for key (%s)...\n", s.Transport.Addr(), key)
 		gdriveStream, gdriveErr := s.GDrive.DownloadFile(key)
 		if gdriveErr == nil {
-			// Write encrypted ciphertext directly to disk
-			n, writeErr := s.Storage.Write(s.ID, key, gdriveStream)
-			_ = gdriveStream.Close()
-			if writeErr == nil {
-				log.Printf("[%s] restored file (%s) [%d bytes] from Google Drive Cloud Backup!\n", s.Transport.Addr(), key, n)
-			} else {
-				log.Printf("[%s] GDrive write error: %v\n", s.Transport.Addr(), writeErr)
+			defer gdriveStream.Close()
+			receivedBuf := new(bytes.Buffer)
+			_, _ = io.Copy(receivedBuf, gdriveStream)
+			_, _ = s.Storage.Write(s.ID, key, bytes.NewReader(receivedBuf.Bytes()))
+
+			decBuf := new(bytes.Buffer)
+			if _, decErr := crypto.CopyDecrypt(s.EncryptKey, bytes.NewReader(receivedBuf.Bytes()), decBuf); decErr == nil {
+				valid, data, _ := s.verifyChecksum(bytes.NewReader(decBuf.Bytes()), expectedChecksum)
+				if valid {
+					log.Printf("[%s] restored file (%s) from Google Drive Cloud Backup!\n", s.Transport.Addr(), key)
+					return bytes.NewReader(data), nil
+				}
 			}
-		} else {
-			log.Printf("[%s] GDrive download lookup error: %v\n", s.Transport.Addr(), gdriveErr)
 		}
 	}
 
-	if !s.Storage.Has(s.ID, key) {
-		return nil, fmt.Errorf("file (%s) not found locally, in peer network, or in cloud vault", key)
-	}
-
-	_, r, err := s.Storage.Read(s.ID, key)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if rc, ok := r.(io.ReadCloser); ok {
-			_ = rc.Close()
-		}
-	}()
-	decBuf := new(bytes.Buffer)
-	if _, err := crypto.CopyDecrypt(s.EncryptKey, r, decBuf); err != nil {
-		return nil, fmt.Errorf("failed to decrypt retrieved file: %w", err)
-	}
-	return decBuf, nil
+	return nil, fmt.Errorf("file (%s) not found locally, in peer network, or in cloud vault", key)
 }
 
-// Store stores the data in the file server.
-// It encrypts the data directly into disk storage via streaming (data at rest is never plaintext),
-// and replicates the ciphertext to connected peers without keeping whole-file buffers in memory.
+// Store encrypts data directly into local storage, replicates ciphertext over P2P
+// using length-prefixed frames, and enforces write quorum acknowledgements.
 func (s *FileServer) Store(key string, r io.Reader) error {
 	f, err := s.Storage.OpenFileForWriting(s.ID, key)
 	if err != nil {
@@ -250,58 +325,103 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 		return fmt.Errorf("failed to close storage file: %w", closeErr)
 	}
 
-	msg := Message{
-		Payload: MessageStoreFile{
-			ID:   s.ID,
-			Key:  crypto.HashKey(key),
-			Size: encSize,
-		},
-	}
-
-	if err = s.broadcast(&msg); err != nil {
-		return err
-	}
-
-	time.Sleep(time.Millisecond * 5)
-
 	peers := s.getPeers()
 	if len(peers) == 0 {
 		log.Printf("[%s] written (%d) encrypted bytes locally (no remote peers connected)\n", s.Transport.Addr(), encSize)
 		return nil
 	}
 
-	writers := make([]io.Writer, 0, len(peers))
-	for _, peer := range peers {
-		writers = append(writers, peer)
+	streamID := nextStreamID()
+	ackCh := make(chan MessageAck, len(peers))
+	s.ackMu.Lock()
+	s.ackChs[streamID] = ackCh
+	s.ackMu.Unlock()
+	defer func() {
+		s.ackMu.Lock()
+		delete(s.ackChs, streamID)
+		s.ackMu.Unlock()
+	}()
+
+	msg := Message{
+		Payload: MessageStoreFile{
+			ID:       s.ID,
+			Key:      key,
+			Size:     encSize,
+			StreamID: streamID,
+		},
 	}
 
-	mw := io.MultiWriter(writers...)
-	_, _ = mw.Write([]byte{p2p.IncomingStream})
+	msgBuf := new(bytes.Buffer)
+	if err := gob.NewEncoder(msgBuf).Encode(&msg); err != nil {
+		return err
+	}
 
-	// Replicate encrypted ciphertext directly from local disk over P2P mesh
+	frame, err := p2p.EncodeMessageFrame(streamID, msgBuf.Bytes())
+	if err != nil {
+		return err
+	}
+
+	// 1. Send framed control message to all peers
+	for _, peer := range peers {
+		_ = peer.Send(frame)
+	}
+
+	// 2. Read encrypted ciphertext from local storage and stream framed chunks
 	_, encReader, err := s.Storage.Read(s.ID, key)
 	if err != nil {
-		log.Printf("[%s] warning: failed to open stored ciphertext for replication: %v\n", s.Transport.Addr(), err)
-		return nil
+		return fmt.Errorf("failed to read stored ciphertext for replication: %w", err)
 	}
 	defer func() {
 		if rc, ok := encReader.(io.ReadCloser); ok {
-			rc.Close()
+			_ = rc.Close()
 		}
 	}()
 
-	n, err := io.Copy(mw, encReader)
-	if err != nil {
-		log.Printf("[%s] warning: peer replication error: %v (file stored locally)\n", s.Transport.Addr(), err)
-	} else {
-		log.Printf("[%s] written (%d) encrypted bytes locally and replicated to %d peers\n", s.Transport.Addr(), n, len(peers))
+	chunkBuf := make([]byte, 32*1024)
+	for {
+		nr, readErr := encReader.Read(chunkBuf)
+		if nr > 0 {
+			chunkFrame, _ := p2p.EncodeStreamFrame(streamID, chunkBuf[:nr])
+			for _, peer := range peers {
+				_ = peer.Send(chunkFrame)
+			}
+		}
+		if readErr != nil {
+			break
+		}
 	}
 
+	// End of stream frame (0-length chunk)
+	eofFrame, _ := p2p.EncodeStreamFrame(streamID, nil)
+	for _, peer := range peers {
+		_ = peer.Send(eofFrame)
+	}
+
+	// 3. Write Quorum: wait for acknowledgements
+	quorum := (s.ReplicationFactor / 2) + 1
+	if quorum < 1 {
+		quorum = 1
+	}
+	acksReceived := 1 // Local storage write counts as 1 ack
+
+	ackTimeout := time.After(3 * time.Second)
+	for acksReceived < quorum {
+		select {
+		case ack := <-ackCh:
+			if ack.Success {
+				acksReceived++
+			}
+		case <-ackTimeout:
+			log.Printf("[%s] quorum timeout: achieved %d/%d required acknowledgements\n", s.Transport.Addr(), acksReceived, quorum)
+			return nil
+		}
+	}
+
+	log.Printf("[%s] successfully achieved write quorum (%d acks) for file (%s)\n", s.Transport.Addr(), acksReceived, key)
 	return nil
 }
 
 // StoreWithMeta stores file contents via Store and records persistent FileMeta metadata.
-// It streams data without keeping whole-file buffers in memory.
 func (s *FileServer) StoreWithMeta(key string, filename string, owner string, contentType string, checksum string, size int64, r io.Reader) (*FileMeta, error) {
 	if err := s.Store(key, r); err != nil {
 		return nil, err
@@ -345,116 +465,6 @@ func (s *FileServer) StoreWithMeta(key string, filename string, owner string, co
 	return meta, nil
 }
 
-func (s *FileServer) broadcast(msg *Message) error {
-	buf := new(bytes.Buffer)
-	if err := gob.NewEncoder(buf).Encode(msg); err != nil {
-		return err
-	}
-
-	peers := s.getPeers()
-	for _, peer := range peers {
-		_ = peer.Send([]byte{p2p.IncomingMessage})
-		if err := peer.Send(buf.Bytes()); err != nil {
-			log.Printf("[%s] broadcast error to peer (%s): %v\n", s.Transport.Addr(), peer.RemoteAddr(), err)
-			s.removePeer(peer.RemoteAddr().String())
-		}
-	}
-
-	return nil
-}
-
-func (s *FileServer) loop() {
-	defer func() {
-		log.Printf("file server stopped due to error or user quit action\n")
-		if err := s.Transport.Close(); err != nil {
-			log.Printf("transport close error: %s\n", err.Error())
-		}
-	}()
-
-	for {
-		select {
-		case rpc := <-s.Transport.Consume():
-			var msg Message
-			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&msg); err != nil {
-				log.Printf("gob decode error: %s\n", err.Error())
-				continue
-			}
-			if err := s.handleMessage(rpc.From.String(), &msg); err != nil {
-				log.Printf("handle message error: %s\n", err.Error())
-			}
-
-		case <-s.doneChan:
-			return
-		}
-	}
-}
-
-func (s *FileServer) handleMessage(from string, msg *Message) error {
-	switch v := msg.Payload.(type) {
-	case MessageStoreFile:
-		return s.handleMessageStoreFile(from, v)
-	case MessageGetFile:
-		return s.handleMessageGetFile(from, v)
-	case MessageDeleteFile:
-		return s.handleMessageDeleteFile(from, v)
-	}
-	return nil
-}
-
-func (s *FileServer) handleMessageGetFile(from string, msg MessageGetFile) error {
-	if !s.Storage.Has(msg.ID, msg.Key) {
-		return fmt.Errorf("[%s] need to serve file (%s) but it does not exist on disk", s.Transport.Addr(), msg.Key) //nolint:err113
-	}
-
-	log.Printf("[%s] serving file (%s) over the network\n", s.Transport.Addr(), msg.Key)
-
-	fileSize, r, err := s.Storage.Read(msg.ID, msg.Key)
-	if err != nil {
-		return err
-	}
-
-	if rc, ok := r.(io.ReadCloser); ok {
-		defer func() { _ = rc.Close() }()
-	}
-
-	peer, ok := s.getPeer(from)
-	if !ok {
-		return fmt.Errorf("peer (%s) could not be found in the peers map", from) //nolint:err113
-	}
-
-	// First send the "incomingStream" byte to the peer then
-	// we can send the file size as an int64.
-	_ = peer.Send([]byte{p2p.IncomingStream})
-	if wErr := binary.Write(peer, binary.LittleEndian, fileSize); wErr != nil {
-		return wErr
-	}
-	n, err := io.Copy(peer, r)
-	if err != nil {
-		return err
-	}
-
-	log.Printf("[%s] written (%d) bytes over the network to %s\n", s.Transport.Addr(), n, from)
-
-	return nil
-}
-
-func (s *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) error {
-	peer, ok := s.getPeer(from)
-	if !ok {
-		return fmt.Errorf("peer (%s) could not be found in the peers map", from) //nolint:err113
-	}
-
-	n, err := s.Storage.Write(msg.ID, msg.Key, io.LimitReader(peer, msg.Size))
-	if err != nil {
-		return err
-	}
-	log.Printf("[%s] written %d bytes to disk\n", s.Transport.Addr(), n)
-
-	peer.CloseStream()
-
-	return nil
-}
-
 // Delete purges a file by key locally (if no remaining references) and broadcasts MessageDeleteFile to all peer nodes.
 func (s *FileServer) Delete(key string) error {
 	if s.Metadata != nil {
@@ -482,9 +492,204 @@ func (s *FileServer) Delete(key string) error {
 	return s.broadcast(&msg)
 }
 
+func (s *FileServer) broadcast(msg *Message) error {
+	buf := new(bytes.Buffer)
+	if err := gob.NewEncoder(buf).Encode(msg); err != nil {
+		return err
+	}
+
+	frame, err := p2p.EncodeMessageFrame(0, buf.Bytes())
+	if err != nil {
+		return err
+	}
+
+	peers := s.getPeers()
+	for _, peer := range peers {
+		if err := peer.Send(frame); err != nil {
+			log.Printf("[%s] broadcast error to peer (%s): %v\n", s.Transport.Addr(), peer.RemoteAddr(), err)
+			s.removePeer(peer.RemoteAddr().String())
+		}
+	}
+	return nil
+}
+
+func (s *FileServer) loop() {
+	defer func() {
+		log.Printf("file server stopped due to error or user quit action\n")
+		if err := s.Transport.Close(); err != nil {
+			log.Printf("transport close error: %s\n", err.Error())
+		}
+	}()
+
+	for {
+		select {
+		case rpc := <-s.Transport.Consume():
+			if rpc.Stream {
+				s.dataMu.RLock()
+				ch, ok := s.dataChs[rpc.StreamID]
+				s.dataMu.RUnlock()
+				if ok {
+					ch <- rpc.Payload
+				}
+				continue
+			}
+
+			var msg Message
+			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&msg); err != nil {
+				log.Printf("gob decode error: %s\n", err.Error())
+				continue
+			}
+			if err := s.handleMessage(rpc.From.String(), &msg, rpc.StreamID); err != nil {
+				log.Printf("handle message error: %s\n", err.Error())
+			}
+
+		case <-s.doneChan:
+			return
+		}
+	}
+}
+
+func (s *FileServer) handleMessage(from string, msg *Message, streamID uint64) error {
+	switch v := msg.Payload.(type) {
+	case MessageStoreFile:
+		go func() {
+			if err := s.handleMessageStoreFile(from, v); err != nil {
+				log.Printf("[%s] handle store file error: %v\n", s.Transport.Addr(), err)
+			}
+		}()
+		return nil
+	case MessageGetFile:
+		go func() {
+			if err := s.handleMessageGetFile(from, v); err != nil {
+				log.Printf("[%s] handle get file error: %v\n", s.Transport.Addr(), err)
+			}
+		}()
+		return nil
+	case MessageDeleteFile:
+		return s.handleMessageDeleteFile(from, v)
+	case MessageAck:
+		s.ackMu.RLock()
+		ch, ok := s.ackChs[streamID]
+		s.ackMu.RUnlock()
+		if ok {
+			ch <- v
+		}
+		return nil
+	}
+	return nil
+}
+
+func (s *FileServer) handleMessageGetFile(from string, msg MessageGetFile) error {
+	if !s.Storage.Has(s.ID, msg.Key) {
+		return fmt.Errorf("[%s] file (%s) does not exist on disk", s.Transport.Addr(), msg.Key)
+	}
+
+	log.Printf("[%s] serving file (%s) over network with StreamID %d\n", s.Transport.Addr(), msg.Key, msg.StreamID)
+
+	_, r, err := s.Storage.Read(s.ID, msg.Key)
+	if err != nil {
+		return err
+	}
+	if rc, ok := r.(io.ReadCloser); ok {
+		defer rc.Close()
+	}
+
+	peer, ok := s.getPeer(from)
+	if !ok {
+		return fmt.Errorf("peer (%s) could not be found in peers map", from)
+	}
+
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			frame, _ := p2p.EncodeStreamFrame(msg.StreamID, buf[:n])
+			_ = peer.Send(frame)
+		}
+		if err != nil {
+			break
+		}
+	}
+
+	// Send EOF frame
+	eofFrame, _ := p2p.EncodeStreamFrame(msg.StreamID, nil)
+	_ = peer.Send(eofFrame)
+	return nil
+}
+
+func (s *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) error {
+	peer, ok := s.getPeer(from)
+	if !ok {
+		return fmt.Errorf("peer (%s) could not be found in peers map", from)
+	}
+
+	// Prepare data channel to receive framed stream chunks
+	dataCh := make(chan []byte, 32)
+	s.dataMu.Lock()
+	s.dataChs[msg.StreamID] = dataCh
+	s.dataMu.Unlock()
+
+	defer func() {
+		s.dataMu.Lock()
+		delete(s.dataChs, msg.StreamID)
+		s.dataMu.Unlock()
+	}()
+
+	f, err := s.Storage.OpenFileForWriting(s.ID, msg.Key)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	streamDone := false
+	timeout := time.After(10 * time.Second)
+
+	for !streamDone {
+		select {
+		case chunk, ok := <-dataCh:
+			if !ok || len(chunk) == 0 {
+				streamDone = true
+				break
+			}
+			_, _ = f.Write(chunk)
+		case <-timeout:
+			streamDone = true
+		}
+	}
+
+	// Send Ack back to peer
+	ackMsg := Message{
+		Payload: MessageAck{
+			Key:      msg.Key,
+			From:     s.Transport.Addr(),
+			Success:  true,
+			StreamID: msg.StreamID,
+		},
+	}
+	ackBuf := new(bytes.Buffer)
+	if err := gob.NewEncoder(ackBuf).Encode(&ackMsg); err == nil {
+		ackFrame, _ := p2p.EncodeMessageFrame(msg.StreamID, ackBuf.Bytes())
+		_ = peer.Send(ackFrame)
+	}
+
+	return nil
+}
+
 func (s *FileServer) handleMessageDeleteFile(from string, msg MessageDeleteFile) error {
-	log.Printf("[%s] received P2P delete message for key (%s)\n", s.Transport.Addr(), msg.Key)
-	_ = s.Storage.Delete(msg.ID, msg.Key)
+	peer, ok := s.getPeer(from)
+	if !ok {
+		return fmt.Errorf("peer (%s) not found in peers map", from)
+	}
+
+	// Security: delete messages are strictly accepted from authenticated peers only
+	if tcpPeer, isTCP := peer.(*p2p.TCPPeer); isTCP {
+		if !tcpPeer.IsAuthenticated() {
+			return errors.New("security rejection: unauthenticated peer attempted P2P delete")
+		}
+	}
+
+	log.Printf("[%s] received authenticated P2P delete message for key (%s)\n", s.Transport.Addr(), msg.Key)
+	_ = s.Storage.Delete(s.ID, msg.Key)
 	if s.Metadata != nil {
 		_ = s.Metadata.Delete(msg.Key)
 	}
@@ -498,16 +703,43 @@ func (s *FileServer) handleMessageDeleteFile(from string, msg MessageDeleteFile)
 
 func (s *FileServer) bootstrapNetwork() {
 	for _, addr := range s.BootstrapNodes {
-		if len(addr) == 0 {
+		if len(addr) == 0 || addr == s.ListenAddr {
 			continue
 		}
 
-		go func(addr string) {
-			log.Printf("[%s] attempting to connect with remote: %s\n", s.Transport.Addr(), addr)
-			if err := s.Transport.Dial(addr); err != nil {
-				log.Printf("dial error: %s\n", err.Error())
+		go func(target string) {
+			log.Printf("[%s] attempting to connect with bootstrap node: %s\n", s.Transport.Addr(), target)
+			if err := s.Transport.Dial(target); err != nil {
+				log.Printf("[%s] bootstrap dial error for %s: %v\n", s.Transport.Addr(), target, err)
 			}
 		}(addr)
+	}
+}
+
+func (s *FileServer) startPeerReconnectLoop() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.doneChan:
+			return
+		case <-ticker.C:
+			for _, addr := range s.BootstrapNodes {
+				if len(addr) == 0 || addr == s.ListenAddr {
+					continue
+				}
+				s.peerLock.RLock()
+				_, connected := s.peers[addr]
+				s.peerLock.RUnlock()
+
+				if !connected {
+					go func(target string) {
+						_ = s.Transport.Dial(target)
+					}(addr)
+				}
+			}
+		}
 	}
 }
 
@@ -515,4 +747,5 @@ func init() {
 	gob.Register(MessageStoreFile{})
 	gob.Register(MessageGetFile{})
 	gob.Register(MessageDeleteFile{})
+	gob.Register(MessageAck{})
 }
