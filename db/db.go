@@ -305,6 +305,25 @@ func (db *DBWrapper) GetFileRecords() ([]*fileserver.FileMeta, error) {
 	return list, nil
 }
 
+// GetFileRecordByKey retrieves file metadata for a specific key from the MySQL database.
+func (db *DBWrapper) GetFileRecordByKey(key string) (*fileserver.FileMeta, error) {
+	if !db.Active || db.DB == nil {
+		return nil, nil
+	}
+
+	query := `SELECT file_key, filename, file_size, content_type, owner_name, checksum, created_at FROM files WHERE file_key = ? LIMIT 1`
+	var m fileserver.FileMeta
+	err := db.QueryRow(query, key).Scan(&m.Key, &m.Filename, &m.Size, &m.ContentType, &m.Owner, &m.Checksum, &m.UploadTime)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	m.Replicas = 3
+	return &m, nil
+}
+
 // UpsertNodeRecord creates or updates cluster node information in the nodes table.
 func (db *DBWrapper) UpsertNodeRecord(id, name, address, role, status string, totalBytes, usedBytes int64) error {
 	if !db.Active || db.DB == nil {

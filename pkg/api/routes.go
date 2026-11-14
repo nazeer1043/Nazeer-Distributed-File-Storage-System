@@ -13,11 +13,10 @@ func RegisterRoutes(mux *http.ServeMux, a *App) {
 	mux.HandleFunc("/api/upload", a.RequireAuth(a.UploadHandler))
 	mux.HandleFunc("/api/download", a.RequireAuth(a.DownloadHandler))
 	mux.HandleFunc("/api/delete", a.RequireAuth(a.DeleteHandler))
-	mux.HandleFunc("/api/nodes", a.RequireAuth(a.NodesHandler))
-	mux.HandleFunc("/api/cluster", a.RequireAuth(a.ClusterHandler))
-	mux.HandleFunc("/api/logs", a.RequireAuth(a.LogsHandler))
-	mux.HandleFunc("/api/settings", a.RequireAuth(a.SettingsHandler))
+	mux.HandleFunc("/api/nodes", a.RequireAdmin(a.NodesHandler))
+	mux.HandleFunc("/api/cluster", a.RequireAdmin(a.ClusterHandler))
+	mux.HandleFunc("/api/logs", a.RequireAdmin(a.LogsHandler))
+	mux.HandleFunc("/api/settings", a.RequireAdmin(a.SettingsHandler))
 	mux.HandleFunc("/api/profile", a.RequireAuth(a.ProfileHandler))
-	mux.HandleFunc("/api/users", a.RequireAuth(a.UsersListHandler))
+	mux.HandleFunc("/api/users", a.RequireAdmin(a.UsersListHandler))
 }
-

@@ -55,10 +55,16 @@ func (a *App) UploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	owner := r.FormValue("owner")
-	if owner == "" {
-		owner = "System Admin"
+	user, ok := a.CurrentUser(r)
+	if !ok || user == nil || user.Username == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(UploadResponse{
+			Success: false,
+			Message: "Authentication required to upload files",
+		})
+		return
 	}
+	owner := user.Username
 
 	// Compute Content-Addressable Storage (CAS) key from filename, owner, and payload
 	var reader io.Reader = file

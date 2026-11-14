@@ -3,9 +3,32 @@ package api
 import (
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"path/filepath"
+	"strings"
+
+	"github.com/yigithankarabulut/distributed-file-storage/fileserver"
 )
 
+// sanitizeFilename strips directory traversal characters, control runes, and quotes from a filename.
+func sanitizeFilename(name string) string {
+	clean := filepath.Base(name)
+	clean = strings.Map(func(r rune) rune {
+		if r < 32 || r == 127 || r == '/' || r == '\\' || r == '"' {
+			return '_'
+		}
+		return r
+	}, clean)
+	clean = strings.TrimSpace(clean)
+	if clean == "" || clean == "." || clean == ".." {
+		clean = "download.bin"
+	}
+	return clean
+}
+
+// DownloadHandler serves stored files by key with strict ownership authorization,
+// secure Content-Disposition formatting, and nosniff protection.
 func (a *App) DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -14,11 +37,7 @@ func (a *App) DownloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	key := r.URL.Query().Get("key")
 	if key == "" {
-		key = r.URL.Query().Get("file")
-	}
-
-	if key == "" {
-		http.Error(w, "Missing file or key query parameter", http.StatusBadRequest)
+		http.Error(w, "Missing key parameter", http.StatusBadRequest)
 		return
 	}
 
@@ -27,33 +46,42 @@ func (a *App) DownloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var filename = key
-	var contentType = "application/octet-stream"
-	var targetKey = key
+	user, ok := a.CurrentUser(r)
+	if !ok || user == nil || user.Username == "" {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+	isAdmin := (user.Role == "admin" || user.Role == "Cluster Admin")
 
-	if a.Servers[0].Metadata != nil {
-		if meta, ok := a.Servers[0].Metadata.Get(key); ok {
-			filename = meta.Filename
-			targetKey = meta.Key
-			if meta.ContentType != "" {
-				contentType = meta.ContentType
-			}
-		} else {
-			metaList := a.Servers[0].Metadata.List()
-			for _, m := range metaList {
-				if m.Filename == key || m.Key == key {
-					filename = m.Filename
-					targetKey = m.Key
-					if m.ContentType != "" {
-						contentType = m.ContentType
-					}
-					break
-				}
+	// Look up file metadata strictly by key (never by filename search across all users)
+	var meta *fileserver.FileMeta
+	for _, srv := range a.Servers {
+		if srv != nil && srv.Metadata != nil {
+			if m, exists := srv.Metadata.Get(key); exists {
+				meta = m
+				break
 			}
 		}
 	}
 
-	reader, err := a.Servers[0].Get(targetKey)
+	if meta == nil && a.DB != nil && a.DB.Active {
+		if m, err := a.DB.GetFileRecordByKey(key); err == nil && m != nil {
+			meta = m
+		}
+	}
+
+	if meta == nil {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	// Enforce ownership: only owner or admin can download
+	if !isAdmin && meta.Owner != user.Username {
+		http.Error(w, "Forbidden: you do not have permission to access this file", http.StatusForbidden)
+		return
+	}
+
+	reader, err := a.Servers[0].Get(key)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("File not found or storage error: %v", err), http.StatusNotFound)
 		return
@@ -63,7 +91,18 @@ func (a *App) DownloadHandler(w http.ResponseWriter, r *http.Request) {
 		defer rc.Close()
 	}
 
+	filename := sanitizeFilename(meta.Filename)
+	contentType := meta.ContentType
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	disposition := mime.FormatMediaType("attachment", map[string]string{
+		"filename": filename,
+	})
+
 	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
-	io.Copy(w, reader)
+	w.Header().Set("Content-Disposition", disposition)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	_, _ = io.Copy(w, reader)
 }

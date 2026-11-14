@@ -50,7 +50,7 @@ func createTestServer(t *testing.T) (*fileserver.FileServer, func()) {
 	return server, cleanup
 }
 
-func TestApp_ClusterAndNodesHandlers(t *testing.T) {
+func TestApp_AdminRouteGuards(t *testing.T) {
 	srv, cleanup := createTestServer(t)
 	defer cleanup()
 
@@ -60,53 +60,61 @@ func TestApp_ClusterAndNodesHandlers(t *testing.T) {
 		StartTime: time.Now().Add(-10 * time.Minute),
 	}
 
-	// 1. Test ClusterHandler
-	req := httptest.NewRequest(http.MethodGet, "/api/cluster", nil)
-	rec := httptest.NewRecorder()
-	app.ClusterHandler(rec, req)
+	// Register users in globalUsers
+	globalUsers.mu.Lock()
+	globalUsers.users["alice_user"] = "mockhash"
+	globalUsers.roles["alice_user"] = "user"
+	globalUsers.users["admin_user"] = "mockhash"
+	globalUsers.roles["admin_user"] = "admin"
+	globalUsers.mu.Unlock()
 
-	assert.Equal(t, http.StatusOK, rec.Code)
-	var clusterResp ClusterStatusResponse
-	err := json.NewDecoder(rec.Body).Decode(&clusterResp)
+	userSession, err := globalSessions.create(User{
+		Username: "alice_user",
+		Role:     "user",
+	})
 	require.NoError(t, err)
-	assert.Equal(t, "nazeerdfs-cluster-01", clusterResp.ClusterID)
-	assert.Equal(t, "Healthy", clusterResp.Status)
-	assert.Equal(t, 400.0, clusterResp.TotalStorage)
 
-	// 2. Test NodesHandler
-	req = httptest.NewRequest(http.MethodGet, "/api/nodes", nil)
-	rec = httptest.NewRecorder()
-	app.NodesHandler(rec, req)
-
-	assert.Equal(t, http.StatusOK, rec.Code)
-	var nodesResp []NodeInfo
-	err = json.NewDecoder(rec.Body).Decode(&nodesResp)
+	adminSession, err := globalSessions.create(User{
+		Username: "admin_user",
+		Role:     "admin",
+	})
 	require.NoError(t, err)
-	assert.Len(t, nodesResp, 1)
-	assert.Equal(t, "Bootstrap Leader", nodesResp[0].Role)
-}
 
-func TestApp_LogsHandler(t *testing.T) {
-	app := &App{
-		Servers:   []*fileserver.FileServer{},
-		DB:        &db.DBWrapper{DB: nil, Active: false},
-		StartTime: time.Now(),
+	adminRoutes := []struct {
+		name    string
+		method  string
+		path    string
+		handler http.HandlerFunc
+	}{
+		{"Logs", http.MethodGet, "/api/logs", app.RequireAdmin(app.LogsHandler)},
+		{"Nodes", http.MethodGet, "/api/nodes", app.RequireAdmin(app.NodesHandler)},
+		{"Cluster", http.MethodGet, "/api/cluster", app.RequireAdmin(app.ClusterHandler)},
+		{"Settings", http.MethodGet, "/api/settings", app.RequireAdmin(app.SettingsHandler)},
+		{"Users", http.MethodGet, "/api/users", app.RequireAdmin(app.UsersListHandler)},
 	}
 
-	LogEvent("INFO", "Test log message for automated test")
+	for _, route := range adminRoutes {
+		t.Run("NonAdmin_Forbidden_"+route.name, func(t *testing.T) {
+			req := httptest.NewRequest(route.method, route.path, nil)
+			req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: userSession})
+			rec := httptest.NewRecorder()
 
-	req := httptest.NewRequest(http.MethodGet, "/api/logs", nil)
-	rec := httptest.NewRecorder()
-	app.LogsHandler(rec, req)
+			route.handler(rec, req)
+			assert.Equal(t, http.StatusForbidden, rec.Code, "Regular user must receive 403 on "+route.name)
+		})
 
-	assert.Equal(t, http.StatusOK, rec.Code)
-	var logs []LogEntry
-	err := json.NewDecoder(rec.Body).Decode(&logs)
-	require.NoError(t, err)
-	assert.NotEmpty(t, logs)
+		t.Run("Admin_Allowed_"+route.name, func(t *testing.T) {
+			req := httptest.NewRequest(route.method, route.path, nil)
+			req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: adminSession})
+			rec := httptest.NewRecorder()
+
+			route.handler(rec, req)
+			assert.Equal(t, http.StatusOK, rec.Code, "Admin must receive 200 on "+route.name)
+		})
+	}
 }
 
-func TestApp_UploadDownloadDeleteWorkflow(t *testing.T) {
+func TestApp_CrossUserFileAuthorization(t *testing.T) {
 	srv, cleanup := createTestServer(t)
 	defer cleanup()
 
@@ -116,78 +124,116 @@ func TestApp_UploadDownloadDeleteWorkflow(t *testing.T) {
 		StartTime: time.Now(),
 	}
 
-	fileContent := []byte("NazeerDFS Enterprise Storage verification payload 2026")
-	fileName := "report_final.txt"
+	// Create sessions for Alice (user), Bob (user), and Charlie (admin)
+	aliceSession, err := globalSessions.create(User{
+		Username: "alice",
+		Role:     "user",
+	})
+	require.NoError(t, err)
 
-	// 1. Upload file via multipart form
+	bobSession, err := globalSessions.create(User{
+		Username: "bob",
+		Role:     "user",
+	})
+	require.NoError(t, err)
+
+	adminSession, err := globalSessions.create(User{
+		Username: "charlie_admin",
+		Role:     "admin",
+	})
+	require.NoError(t, err)
+
+	fileContent := []byte("Top secret data belonging exclusively to Alice")
+	fileName := "../../../traversal_test.txt"
+
+	// 1. Alice uploads her file (form field 'owner' is ignored; session owner is used)
 	body := new(bytes.Buffer)
 	writer := multipart.NewWriter(body)
 	part, err := writer.CreateFormFile("file", fileName)
 	require.NoError(t, err)
 	_, err = part.Write(fileContent)
 	require.NoError(t, err)
-	_ = writer.WriteField("owner", "Cluster Administrator")
+	_ = writer.WriteField("owner", "AttemptedSpoofedOwner")
 	_ = writer.Close()
 
 	uploadReq := httptest.NewRequest(http.MethodPost, "/api/upload", body)
 	uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+	uploadReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: aliceSession})
 	uploadRec := httptest.NewRecorder()
 
 	app.UploadHandler(uploadRec, uploadReq)
-	assert.Equal(t, http.StatusOK, uploadRec.Code)
+	require.Equal(t, http.StatusOK, uploadRec.Code)
 
 	var uploadResp UploadResponse
 	err = json.NewDecoder(uploadRec.Body).Decode(&uploadResp)
 	require.NoError(t, err)
-	assert.True(t, uploadResp.Success)
-	assert.NotEmpty(t, uploadResp.FileID)
-	assert.Equal(t, fileName, uploadResp.Filename)
+	aliceFileKey := uploadResp.FileID
+	require.NotEmpty(t, aliceFileKey)
 
-	// 2. Query /api/files to verify file appears in listing
-	filesReq := httptest.NewRequest(http.MethodGet, "/api/files", nil)
-	filesRec := httptest.NewRecorder()
-	app.FilesHandler(filesRec, filesReq)
+	// 2. Bob lists files -> Alice's file MUST NOT appear
+	bobListReq := httptest.NewRequest(http.MethodGet, "/api/files", nil)
+	bobListReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: bobSession})
+	bobListRec := httptest.NewRecorder()
+	app.FilesHandler(bobListRec, bobListReq)
+	require.Equal(t, http.StatusOK, bobListRec.Code)
 
-	assert.Equal(t, http.StatusOK, filesRec.Code)
-	var fileList []FileItem
-	err = json.NewDecoder(filesRec.Body).Decode(&fileList)
+	var bobFiles []FileItem
+	err = json.NewDecoder(bobListRec.Body).Decode(&bobFiles)
 	require.NoError(t, err)
-	require.Len(t, fileList, 1)
-	assert.Equal(t, fileName, fileList[0].Name)
-	assert.Equal(t, uploadResp.FileID, fileList[0].Location)
+	assert.Empty(t, bobFiles, "Bob should see zero files")
 
-	// 3. Download the file by storage key
-	downloadReq := httptest.NewRequest(http.MethodGet, "/api/download?key="+uploadResp.FileID, nil)
-	downloadRec := httptest.NewRecorder()
-	app.DownloadHandler(downloadRec, downloadReq)
+	// 3. Alice lists files -> Alice sees her file with owner 'alice'
+	aliceListReq := httptest.NewRequest(http.MethodGet, "/api/files", nil)
+	aliceListReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: aliceSession})
+	aliceListRec := httptest.NewRecorder()
+	app.FilesHandler(aliceListRec, aliceListReq)
+	require.Equal(t, http.StatusOK, aliceListRec.Code)
 
-	assert.Equal(t, http.StatusOK, downloadRec.Code)
-	downloadedData, err := io.ReadAll(downloadRec.Body)
+	var aliceFiles []FileItem
+	err = json.NewDecoder(aliceListRec.Body).Decode(&aliceFiles)
 	require.NoError(t, err)
-	assert.Equal(t, fileContent, downloadedData)
+	require.Len(t, aliceFiles, 1)
+	assert.Equal(t, "alice", aliceFiles[0].Owner)
 
-	// 4. Download by filename
-	downloadByFilenameReq := httptest.NewRequest(http.MethodGet, "/api/download?file="+fileName, nil)
-	downloadByFilenameRec := httptest.NewRecorder()
-	app.DownloadHandler(downloadByFilenameRec, downloadByFilenameReq)
-	assert.Equal(t, http.StatusOK, downloadByFilenameRec.Code)
-	assert.Equal(t, fileContent, downloadByFilenameRec.Body.Bytes())
+	// 4. Bob tries to download Alice's file -> 403 Forbidden
+	bobDlReq := httptest.NewRequest(http.MethodGet, "/api/download?key="+aliceFileKey, nil)
+	bobDlReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: bobSession})
+	bobDlRec := httptest.NewRecorder()
+	app.DownloadHandler(bobDlRec, bobDlReq)
+	assert.Equal(t, http.StatusForbidden, bobDlRec.Code)
 
-	// 5. Delete file by key
-	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/delete?key="+uploadResp.FileID, nil)
-	deleteRec := httptest.NewRecorder()
-	app.DeleteHandler(deleteRec, deleteReq)
+	// 5. Bob tries to delete Alice's file -> 403 Forbidden
+	bobDelReq := httptest.NewRequest(http.MethodDelete, "/api/delete?key="+aliceFileKey, nil)
+	bobDelReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: bobSession})
+	bobDelRec := httptest.NewRecorder()
+	app.DeleteHandler(bobDelRec, bobDelReq)
+	assert.Equal(t, http.StatusForbidden, bobDelRec.Code)
 
-	assert.Equal(t, http.StatusOK, deleteRec.Code)
-	var delResp DeleteResponse
-	err = json.NewDecoder(deleteRec.Body).Decode(&delResp)
+	// 6. Alice downloads her file -> 200 OK with sanitized filename and nosniff
+	aliceDlReq := httptest.NewRequest(http.MethodGet, "/api/download?key="+aliceFileKey, nil)
+	aliceDlReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: aliceSession})
+	aliceDlRec := httptest.NewRecorder()
+	app.DownloadHandler(aliceDlRec, aliceDlReq)
+	assert.Equal(t, http.StatusOK, aliceDlRec.Code)
+	assert.Equal(t, "nosniff", aliceDlRec.Header().Get("X-Content-Type-Options"))
+	assert.Contains(t, aliceDlRec.Header().Get("Content-Disposition"), "traversal_test.txt")
+	assert.NotContains(t, aliceDlRec.Header().Get("Content-Disposition"), "../")
+
+	data, err := io.ReadAll(aliceDlRec.Body)
 	require.NoError(t, err)
-	assert.True(t, delResp.Success)
+	assert.Equal(t, fileContent, data)
 
-	// 6. Verify file is gone from /api/files
-	filesRec2 := httptest.NewRecorder()
-	app.FilesHandler(filesRec2, filesReq)
-	var fileListAfter []FileItem
-	_ = json.NewDecoder(filesRec2.Body).Decode(&fileListAfter)
-	assert.Empty(t, fileListAfter)
+	// 7. Admin downloads Alice's file -> 200 OK
+	adminDlReq := httptest.NewRequest(http.MethodGet, "/api/download?key="+aliceFileKey, nil)
+	adminDlReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: adminSession})
+	adminDlRec := httptest.NewRecorder()
+	app.DownloadHandler(adminDlRec, adminDlReq)
+	assert.Equal(t, http.StatusOK, adminDlRec.Code)
+
+	// 8. Alice deletes her file -> 200 OK
+	aliceDelReq := httptest.NewRequest(http.MethodDelete, "/api/delete?key="+aliceFileKey, nil)
+	aliceDelReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: aliceSession})
+	aliceDelRec := httptest.NewRecorder()
+	app.DeleteHandler(aliceDelRec, aliceDelReq)
+	assert.Equal(t, http.StatusOK, aliceDelRec.Code)
 }

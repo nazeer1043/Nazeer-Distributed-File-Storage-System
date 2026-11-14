@@ -732,6 +732,41 @@ func (a *App) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// CurrentUser returns the authenticated User for the given request, if present and valid.
+func (a *App) CurrentUser(r *http.Request) (*User, bool) {
+	if username := r.Header.Get("X-User-Username"); username != "" {
+		return &User{
+			Username: username,
+			Name:     r.Header.Get("X-User-Name"),
+			Role:     r.Header.Get("X-User-Role"),
+		}, true
+	}
+
+	cookie, err := r.Cookie(sessionCookieName)
+	if err != nil || cookie.Value == "" {
+		return nil, false
+	}
+
+	user, valid := globalSessions.get(cookie.Value)
+	if valid {
+		return &user, true
+	}
+
+	if a != nil && a.DB != nil && a.DB.Active {
+		dbUser, err := a.DB.GetSessionUser(cookie.Value)
+		if err == nil && dbUser != nil {
+			return &User{
+				ID:       dbUser.ID,
+				Username: dbUser.Username,
+				Name:     dbUser.FullName,
+				Role:     dbUser.Role,
+			}, true
+		}
+	}
+
+	return nil, false
+}
+
 // RequireAdmin middleware restricts routes to admin users.
 func (a *App) RequireAdmin(next http.HandlerFunc) http.HandlerFunc {
 	return a.RequireAuth(func(w http.ResponseWriter, r *http.Request) {

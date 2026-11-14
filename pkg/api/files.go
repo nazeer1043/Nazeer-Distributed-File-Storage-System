@@ -33,6 +33,13 @@ func (a *App) FilesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 
+	user, ok := a.CurrentUser(r)
+	if !ok || user == nil || user.Username == "" {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+	isAdmin := (user.Role == "admin" || user.Role == "Cluster Admin")
+
 	var result []FileItem
 	seenKeys := make(map[string]bool)
 	idCounter := 1
@@ -41,6 +48,9 @@ func (a *App) FilesHandler(w http.ResponseWriter, r *http.Request) {
 		if srv != nil && srv.Metadata != nil {
 			metaList := srv.Metadata.List()
 			for _, m := range metaList {
+				if !isAdmin && m.Owner != user.Username {
+					continue
+				}
 				if seenKeys[m.Key] {
 					continue
 				}
@@ -84,6 +94,9 @@ func (a *App) FilesHandler(w http.ResponseWriter, r *http.Request) {
 	if len(result) == 0 && a.DB != nil && a.DB.Active {
 		if dbFiles, err := a.DB.GetFileRecords(); err == nil {
 			for _, m := range dbFiles {
+				if !isAdmin && m.Owner != user.Username {
+					continue
+				}
 				if seenKeys[m.Key] {
 					continue
 				}
