@@ -21,6 +21,7 @@ import (
 type ServerOpts struct {
 	ID                string
 	EncryptKey        []byte
+	KeyID             string
 	ListenAddr        string
 	StorageRoot       string
 	PathTransformFunc store.PathTransformFunc
@@ -135,7 +136,19 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 	if s.Storage.Has(s.ID, key) {
 		log.Printf("[%s] serving file (%s) from local disk\n", s.Transport.Addr(), key)
 		_, r, err := s.Storage.Read(s.ID, key)
-		return r, err
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if rc, ok := r.(io.ReadCloser); ok {
+				_ = rc.Close()
+			}
+		}()
+		decBuf := new(bytes.Buffer)
+		if _, err := crypto.CopyDecrypt(s.EncryptKey, r, decBuf); err != nil {
+			return nil, fmt.Errorf("failed to decrypt local file: %w", err)
+		}
+		return decBuf, nil
 	}
 
 	log.Printf("[%s] dont have the file (%s) locally, fetching from network...\n", s.Transport.Addr(), key)
@@ -162,14 +175,14 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 			continue
 		}
 
-		n, err := s.Storage.WriteDecrypt(
-			s.EncryptKey,
+		// Store received encrypted ciphertext directly to local disk
+		n, err := s.Storage.Write(
 			s.ID,
 			key,
 			io.LimitReader(peer, fileSize),
 		)
 		if err != nil {
-			log.Printf("[%s] decrypt write error from (%s): %v\n", s.Transport.Addr(), peer.RemoteAddr(), err)
+			log.Printf("[%s] write error from (%s): %v\n", s.Transport.Addr(), peer.RemoteAddr(), err)
 			continue
 		}
 
@@ -180,34 +193,60 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 	}
 
 	if !fetchedOverP2P && s.GDrive != nil && s.GDrive.Enabled {
-		log.Printf("[%s] checking Google Drive 400GB Cloud Backup for key (%s)...\n", s.Transport.Addr(), key)
+		log.Printf("[%s] checking Google Drive Cloud Backup for key (%s)...\n", s.Transport.Addr(), key)
 		gdriveStream, gdriveErr := s.GDrive.DownloadFile(key)
 		if gdriveErr == nil {
-			n, writeErr := s.Storage.WriteDecrypt(s.EncryptKey, s.ID, key, gdriveStream)
+			// Write encrypted ciphertext directly to disk
+			n, writeErr := s.Storage.Write(s.ID, key, gdriveStream)
 			_ = gdriveStream.Close()
 			if writeErr == nil {
 				log.Printf("[%s] restored file (%s) [%d bytes] from Google Drive Cloud Backup!\n", s.Transport.Addr(), key, n)
 			} else {
-				log.Printf("[%s] GDrive decrypt write error: %v\n", s.Transport.Addr(), writeErr)
+				log.Printf("[%s] GDrive write error: %v\n", s.Transport.Addr(), writeErr)
 			}
 		} else {
 			log.Printf("[%s] GDrive download lookup error: %v\n", s.Transport.Addr(), gdriveErr)
 		}
 	}
 
+	if !s.Storage.Has(s.ID, key) {
+		return nil, fmt.Errorf("file (%s) not found locally, in peer network, or in cloud vault", key)
+	}
+
 	_, r, err := s.Storage.Read(s.ID, key)
-	return r, err
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if rc, ok := r.(io.ReadCloser); ok {
+			_ = rc.Close()
+		}
+	}()
+	decBuf := new(bytes.Buffer)
+	if _, err := crypto.CopyDecrypt(s.EncryptKey, r, decBuf); err != nil {
+		return nil, fmt.Errorf("failed to decrypt retrieved file: %w", err)
+	}
+	return decBuf, nil
 }
 
 // Store stores the data in the file server.
-// It writes the data to the store and then broadcasts the message to the peers.
+// It encrypts the data before writing to local disk (data at rest is never plaintext),
+// and replicates the ciphertext to connected peers.
 func (s *FileServer) Store(key string, r io.Reader) error {
-	var (
-		fileBuffer = new(bytes.Buffer)
-		tee        = io.TeeReader(r, fileBuffer)
-	)
+	encBuf := new(bytes.Buffer)
+	keyID := s.KeyID
+	if keyID == "" {
+		keyID = "k1"
+	}
+	encSize, err := crypto.EncryptStream(s.EncryptKey, keyID, r, encBuf)
+	if err != nil {
+		return fmt.Errorf("encryption error: %w", err)
+	}
 
-	size, err := s.Storage.Write(s.ID, key, tee)
+	encBytes := encBuf.Bytes()
+
+	// 1. Write encrypted ciphertext to local disk storage
+	size, err := s.Storage.Write(s.ID, key, bytes.NewReader(encBytes))
 	if err != nil {
 		return err
 	}
@@ -216,7 +255,7 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 		Payload: MessageStoreFile{
 			ID:   s.ID,
 			Key:  crypto.HashKey(key),
-			Size: size + 16,
+			Size: size,
 		},
 	}
 
@@ -228,7 +267,7 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 
 	peers := s.getPeers()
 	if len(peers) == 0 {
-		log.Printf("[%s] written (%d) bytes locally (no remote peers connected)\n", s.Transport.Addr(), size)
+		log.Printf("[%s] written (%d) encrypted bytes locally (no remote peers connected)\n", s.Transport.Addr(), encSize)
 		return nil
 	}
 
@@ -240,11 +279,12 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 	mw := io.MultiWriter(writers...)
 	_, _ = mw.Write([]byte{p2p.IncomingStream})
 
-	n, err := crypto.CopyEncrypt(s.EncryptKey, fileBuffer, mw)
+	// 2. Replicate encrypted ciphertext directly over P2P mesh
+	n, err := io.Copy(mw, bytes.NewReader(encBytes))
 	if err != nil {
-		log.Printf("[%s] warning: peer replication error: %v (file stored locally and queued for GDrive)\n", s.Transport.Addr(), err)
+		log.Printf("[%s] warning: peer replication error: %v (file stored locally)\n", s.Transport.Addr(), err)
 	} else {
-		log.Printf("[%s] written (%d) bytes locally and replicated to %d peers\n", s.Transport.Addr(), n, len(peers))
+		log.Printf("[%s] written (%d) encrypted bytes locally and replicated to %d peers\n", s.Transport.Addr(), n, len(peers))
 	}
 
 	return nil
@@ -285,15 +325,17 @@ func (s *FileServer) StoreWithMeta(key string, filename string, owner string, co
 	}
 
 	if s.GDrive != nil && s.GDrive.Enabled {
-		encBuf := new(bytes.Buffer)
-		if _, encErr := crypto.CopyEncrypt(s.EncryptKey, bytes.NewReader(data), encBuf); encErr == nil {
-			if driveFileID, gdriveErr := s.GDrive.UploadFile(key, filename, encBuf); gdriveErr == nil {
-				log.Printf("[%s] Google Drive Cloud Backup upload successful for (%s)! Drive File ID: %s\n", s.ListenAddr, filename, driveFileID)
-			} else {
-				log.Printf("[%s] GDrive upload error for (%s): %v\n", s.ListenAddr, filename, gdriveErr)
-			}
-		} else {
-			log.Printf("[%s] GDrive encryption error: %v\n", s.ListenAddr, encErr)
+		if _, encReader, err := s.Storage.Read(s.ID, key); err == nil {
+			func() {
+				if rc, ok := encReader.(io.ReadCloser); ok {
+					defer rc.Close()
+				}
+				if driveFileID, gdriveErr := s.GDrive.UploadFile(key, filename, encReader); gdriveErr == nil {
+					log.Printf("[%s] Google Drive Cloud Backup upload successful for (%s)! Drive File ID: %s\n", s.ListenAddr, filename, driveFileID)
+				} else {
+					log.Printf("[%s] GDrive upload error for (%s): %v\n", s.ListenAddr, filename, gdriveErr)
+				}
+			}()
 		}
 	}
 

@@ -81,6 +81,18 @@ func (s *Store) Write(id, key string, r io.Reader) (int64, error) {
 	return s.writeStream(id, key, r)
 }
 
+// WriteEncrypt encrypts data with authenticated chunked encryption before writing to disk.
+func (s *Store) WriteEncrypt(encryptKey []byte, id, key string, r io.Reader) (int64, error) {
+	f, err := s.openFileForWriting(id, key)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+
+	n, err := crypto.CopyEncrypt(encryptKey, r, f)
+	return int64(n), err
+}
+
 // WriteDecrypt writes a key to the storage with decryption. It uses the given encryption key to decrypt the data.
 func (s *Store) WriteDecrypt(encryptKey []byte, id, key string, r io.Reader) (int64, error) {
 	f, err := s.openFileForWriting(id, key)
