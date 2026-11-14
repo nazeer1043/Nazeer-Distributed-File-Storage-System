@@ -101,8 +101,9 @@ func getOAuthClient(ctx context.Context, credsBytes []byte) (*http.Client, error
 
 		mux := http.NewServeMux()
 		server := &http.Server{
-			Addr:    ":8089",
-			Handler: mux,
+			Addr:              ":8089",
+			Handler:           mux,
+			ReadHeaderTimeout: 10 * time.Second,
 		}
 
 		mux.HandleFunc("/oauth/callback", func(w http.ResponseWriter, r *http.Request) {

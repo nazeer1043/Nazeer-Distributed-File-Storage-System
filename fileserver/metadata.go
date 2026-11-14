@@ -35,7 +35,7 @@ type MetadataStore struct {
 
 // NewMetadataStore creates and initializes a metadata store for a given storage root.
 func NewMetadataStore(storageRoot string) (*MetadataStore, error) {
-	if err := os.MkdirAll(storageRoot, 0755); err != nil {
+	if err := os.MkdirAll(storageRoot, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create storage root directory: %w", err)
 	}
 
@@ -94,7 +94,7 @@ func (ms *MetadataStore) saveLocked() error {
 	}
 
 	tmpFile := ms.filePath + ".tmp"
-	if err := os.WriteFile(tmpFile, data, 0644); err != nil {
+	if err := os.WriteFile(tmpFile, data, 0600); err != nil {
 		return fmt.Errorf("failed to write tmp metadata file: %w", err)
 	}
 

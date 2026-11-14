@@ -1,0 +1,6 @@
+# Gitleaks ignore list for test fixtures and historic sha256 hashes
+9514c6293ba8749b9bf7393d9edbe73ffac92090:api/auth.go:generic-api-key:23
+fa1dd1ba4b57f306f7e39f1288251ba99e7b1194:p2p/handshake_test.go:generic-api-key:40
+p2p/handshake_test.go:generic-api-key:40
+credentials.json:generic-api-key:1
+3000_network/metadata.json:generic-api-key:3

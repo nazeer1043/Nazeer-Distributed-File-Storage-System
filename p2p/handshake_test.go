@@ -37,7 +37,7 @@ func TestMutualHMAC_Authentication_Success(t *testing.T) {
 
 func TestMutualHMAC_Authentication_Rejected_WrongSecret(t *testing.T) {
 	correctSecret := "valid-cluster-secret-12345"
-	wrongSecret := "attacker-invalid-secret-99999"
+	wrongSecret := "attacker-invalid-auth-key-fail"
 
 	clientConn, serverConn := net.Pipe()
 	defer clientConn.Close()

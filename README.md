@@ -113,6 +113,15 @@ go vet ./...
 
 ---
 
+## Documentation
+
+- [**System Architecture**](ARCHITECTURE.md) — Comprehensive technical design, CAS specification, P2P binary framing wire format, and quorum replication.
+- [**Operations Runbook**](RUNBOOK.md) — Production setup, Docker Compose, Render deployment, monitoring, telemetry, and disaster recovery.
+- [**Security Policy & Threat Model**](SECURITY.md) — Threat model, cryptographic primitives, authentication, and zero-downtime key rotation guide.
+- [**Status & Limitations**](STATUS.md) — Verified production readiness checklist and documented architectural boundaries.
+
+---
+
 ## Status & Limitations
 
 See [`STATUS.md`](STATUS.md) for current engineering limits and design trade-offs.

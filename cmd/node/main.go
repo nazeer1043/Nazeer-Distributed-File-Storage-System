@@ -67,7 +67,10 @@ func main() {
 
 	clusterSecret := cfg.ClusterSecret
 	if clusterSecret == "" {
-		clusterSecret = "nazeerdfs_cluster_secret_fallback_key"
+		if os.Getenv("APP_ENV") == "production" {
+			log.Fatalf("[FATAL] CLUSTER_SECRET must be set in production mode")
+		}
+		clusterSecret = "dev-cluster-secret-32-bytes-long!!"
 	}
 
 	transport := p2p.NewTCPTransport(

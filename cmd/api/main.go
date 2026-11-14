@@ -83,15 +83,21 @@ func main() {
 	fs := http.FileServer(http.Dir(webDir))
 
 	staticHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
+		path := filepath.Clean("/" + r.URL.Path)
 		if path == "/" {
 			http.ServeFile(w, r, filepath.Join(webDir, "index.html"))
 			return
 		}
 		cleanPath := filepath.Join(webDir, strings.TrimPrefix(path, "/"))
+		rel, err := filepath.Rel(webDir, cleanPath)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
 		if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
-			if _, errHTML := os.Stat(cleanPath + ".html"); errHTML == nil {
-				http.ServeFile(w, r, cleanPath+".html")
+			htmlCandidate := cleanPath + ".html"
+			if _, errHTML := os.Stat(htmlCandidate); errHTML == nil {
+				http.ServeFile(w, r, htmlCandidate)
 				return
 			}
 		}

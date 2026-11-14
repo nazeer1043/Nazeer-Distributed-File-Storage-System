@@ -1,31 +1,30 @@
-# NazeerDFS Architecture & Status
+# NazeerDFS Architecture & Production Readiness Status
 
 ## Overview
-NazeerDFS is a peer-to-peer (P2P), content-addressed distributed file storage system written in Go. It provides chunked local file storage across interconnected nodes, dual-tier Google Drive cloud fallback, MySQL metadata persistence, and a web dashboard.
+NazeerDFS is a peer-to-peer (P2P), content-addressed distributed file storage system written in Go. It provides client authentication, role-based authorization, authenticated chunked encryption at rest, framed binary P2P replication with mutual HMAC authentication, MySQL metadata persistence with versioned migrations, and an asynchronous Google Drive cloud backup tier.
 
 ---
 
-## Current Status & Verification
+## Verified Subsystems & Production Readiness
 
-This document provides a realistic, verified technical status of the codebase across all core subsystems.
-
-### Core Capabilities
-- **Content-Addressed Storage (CAS):** Files are chunked and placed into directory trees transformed from SHA-256 digests (`CASPathTransformFunc`), preventing filesystem directory saturation.
-- **HTTP REST & Dashboard:** Go `net/http` server serving a responsive web interface and RESTful endpoints for file upload, download, metadata inspection, and cluster monitoring.
-- **Dual-Tier Storage Fallback:** When a requested file is absent from the local storage root and peer network, nodes can query a Google Drive backup vault if credentials are provided.
-- **MySQL Metadata Persistence:** Stores file metadata, user accounts, and node states in MySQL with an automatic in-memory fallback for local development or disconnected testing.
+| Phase | Subsystem | Status | Verification & Evidence |
+| :--- | :--- | :--- | :--- |
+| **Phase 0** | Repo Hygiene & Config | **Completed** | Secrets & build artifacts untracked from git index; strict fail-fast env validation (`config.Validate()`); `.env.example` added; MIT LICENSE and honest README created. |
+| **Phase 1** | Encryption at Rest | **Completed** | Authenticated AES-256-GCM chunked encryption (64KB blocks) with versioned `NDFS` header, key ID, and derived nonces. Round-trip, tamper detection, truncation, and wrong-key test suite passing. |
+| **Phase 2** | Authentication | **Completed** | `bcrypt` hashing (cost 12, min length 12); dynamic admin bootstrap from env; MySQL session table with SHA-256 token hashing; double-submit CSRF middleware; security headers (CSP, nosniff, frame-ancestors). |
+| **Phase 3** | Authorization | **Completed** | Server-side session ownership; lookups strictly by key (no cross-user filename searches); admin guards on `/api/nodes`, `/api/cluster`, `/api/logs`, `/api/users`; safe `Content-Disposition` formatting. |
+| **Phase 4** | Uploads & CAS | **Completed** | Streaming uploads via `r.MultipartReader()` into temp files while hashing (bounded RAM <50MB); `http.MaxBytesReader` limits; CAS key: `sha256(owner:contentSHA)`; deduplication with reference counting. |
+| **Phase 5** | P2P Protocol | **Completed** | Length-prefixed binary framed protocol (`ND` magic, FrameType, StreamID, PayloadLen, Payload); mutual HMAC-SHA256 challenge-response handshake; write quorum consensus; multi-node failover and decoder fuzz tests passing. |
+| **Phase 6** | Topology & Deployment | **Completed** | Standalone binaries `cmd/node` and `cmd/api`; dynamic node routing via consistent hashing and round-robin with health checks; async Google Drive retry queue with exponential backoff; Vercel serverless artifacts removed. |
+| **Phase 7** | Operations & Reliability | **Completed** | Structured `log/slog` with request ID propagation and query secret redaction; `/healthz`, `/readyz`, and Prometheus `/metrics`; `golang-migrate` versioned schema migrations; non-root minimal `Dockerfile`; GitHub Actions CI. |
+| **Phase 8** | Documentation | **Completed** | Comprehensive `ARCHITECTURE.md`, `SECURITY.md`, and `RUNBOOK.md` detailing operational procedures and threat model. |
 
 ---
 
-## Known Limits & Architectural Constraints
+## Remaining Production Limitations
 
-1. **P2P Transport & Framing:**
-   - Peer synchronization historically used basic TCP streams and `time.Sleep` pauses rather than framed binary protocols. This is undergoing overhaul to length-prefixed binary framing with mutual authentication.
-2. **Encryption at Rest:**
-   - The original implementation derived ephemeral keys per process run. Key management is being shifted to persistent 32-byte keys loaded strictly via environment variables (`ENCRYPTION_KEY`) or mounted secret files with versioned ciphertext headers.
-3. **Upload Buffering & Streaming:**
-   - Large file uploads previously buffered into memory. Streaming via `r.MultipartReader()` directly to temporary disk buffers is required to handle multi-gigabyte uploads within bounded memory (<100MB RAM).
-4. **Topology & Consensus:**
-   - The cluster uses broadcast replication with best-effort peer synchronization. It does not implement Paxos/Raft consensus or automated data rebalancing when a node is permanently decommissioned.
-5. **Deployment Model:**
-   - Serverless platforms (e.g. Vercel) cannot host persistent TCP listening sockets or long-lived P2P peer meshes. NazeerDFS is designed for containerized environments (Docker, Render, Kubernetes, or bare VMs) with persistent disk mounts.
+To maintain architectural integrity, the following operational boundaries and limitations are documented:
+1. **No Automated Data Rebalancing**: When a new storage node is added to a running cluster, existing file shards are not automatically re-shuffled across the new node. New writes will utilize the expanded node pool.
+2. **Passive Self-Healing Only**: The cluster detects and repairs corrupted or missing file chunks on-demand during read/download requests by fetching from peer replicas or Google Drive. It does not run a continuous background disk-scrubbing process across all cold files.
+3. **Single Datacenter / LAN Latency Assumption**: The P2P replication protocol assumes low-latency intra-cluster communication (Docker bridge, Kubernetes pod network, or private LAN). It is not optimized for high-latency cross-region WAN topologies.
+4. **Split-Brain Tolerance**: Network partitions that prevent a node from achieving write quorum (`(ReplicationFactor / 2) + 1`) will cause write operations on that node to fail fast to prevent split-brain diverging states.
