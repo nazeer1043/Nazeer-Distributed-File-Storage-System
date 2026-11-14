@@ -675,6 +675,11 @@
                     <a href="#" class="forgot-link">Forgot password?</a>
                 </div>
 
+                <div id="quickAdminBtn" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: rgba(249, 115, 22, 0.08); border: 1px dashed rgba(249, 115, 22, 0.35); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 11px; color: var(--color-primary); transition: all 0.2s ease;">
+                    <span><i class="fa-solid fa-shield-halved" style="margin-right: 6px;"></i><strong>Admin Login:</strong> <code>admin</code> / <code>admin123</code></span>
+                    <span style="font-weight: 600; text-decoration: underline;">Auto-Fill</span>
+                </div>
+
                 <button class="btn-primary" type="submit">
                     <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In
                 </button>
@@ -879,6 +884,18 @@
                 }
             });
 
+            // Quick Admin Auto-fill Button
+            const quickAdminBtn = document.getElementById('quickAdminBtn');
+            if (quickAdminBtn) {
+                quickAdminBtn.addEventListener('click', () => {
+                    const uInput = document.getElementById('loginEmail');
+                    const pInput = document.getElementById('loginPassword');
+                    if (uInput) uInput.value = 'admin';
+                    if (pInput) pInput.value = 'admin123';
+                    loginBtn.focus();
+                });
+            }
+
             // ---------- REGISTER FORM SUBMISSION ----------
             const regBtn = registerForm.querySelector('.btn-primary');
             let regError = document.getElementById('regError');
@@ -893,8 +910,8 @@
                 registerForm.insertBefore(regError, regBtn);
             }
 
-            registerForm.addEventListener('submit', async function (e) {
-                e.preventDefault();
+            async function performRegister(e) {
+                if (e) e.preventDefault();
                 const nameInput = document.getElementById('regName');
                 const emailInput = document.getElementById('regEmail');
                 const passInput = document.getElementById('regPassword');
@@ -908,6 +925,12 @@
 
                 if (!email || !password) {
                     regError.textContent = 'Work Email and password are required.';
+                    regError.style.display = 'block';
+                    return;
+                }
+
+                if (password.length < 3) {
+                    regError.textContent = 'Password must be at least 3 characters.';
                     regError.style.display = 'block';
                     return;
                 }
@@ -936,6 +959,15 @@
                 } finally {
                     regBtn.innerHTML = originalText;
                     regBtn.disabled = false;
+                }
+            }
+
+            regBtn.addEventListener('click', performRegister);
+            [document.getElementById('regName'), document.getElementById('regEmail'), document.getElementById('regPassword')].forEach(input => {
+                if (input) {
+                    input.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter') performRegister(e);
+                    });
                 }
             });
 

@@ -213,6 +213,58 @@ func (db *DBWrapper) DeleteSession(token string) error {
 	return nil
 }
 
+// UpdateUser updates the full name and username for a user by ID or username.
+func (db *DBWrapper) UpdateUser(id, fullName, username string) error {
+	if !db.Active || db.DB == nil {
+		return nil
+	}
+	query := `UPDATE users SET full_name = ?, username = ?, updated_at = NOW() WHERE id = ? OR username = ?`
+	_, err := db.Exec(query, fullName, username, id, username)
+	if err != nil {
+		log.Printf("[MySQL] Error updating user profile (%s): %v\n", id, err)
+		return err
+	}
+	return nil
+}
+
+// UpdateUserPassword updates a user's password hash by ID or username.
+func (db *DBWrapper) UpdateUserPassword(id, passwordHash string) error {
+	if !db.Active || db.DB == nil {
+		return nil
+	}
+	query := `UPDATE users SET password_hash = ?, updated_at = NOW() WHERE id = ? OR username = ?`
+	_, err := db.Exec(query, passwordHash, id, id)
+	if err != nil {
+		log.Printf("[MySQL] Error updating user password (%s): %v\n", id, err)
+		return err
+	}
+	return nil
+}
+
+// GetAllUsers retrieves all registered user records from the database.
+func (db *DBWrapper) GetAllUsers() ([]UserRecord, error) {
+	if !db.Active || db.DB == nil {
+		return nil, nil
+	}
+	query := `SELECT id, username, password_hash, full_name, role, created_at FROM users ORDER BY created_at DESC`
+	rows, err := db.Query(query)
+	if err != nil {
+		log.Printf("[MySQL] Error querying all users: %v\n", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []UserRecord
+	for rows.Next() {
+		var u UserRecord
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.FullName, &u.Role, &u.CreatedAt); err != nil {
+			continue
+		}
+		users = append(users, u)
+	}
+	return users, nil
+}
+
 // GetFileRecords retrieves all stored file metadata from the MySQL database.
 func (db *DBWrapper) GetFileRecords() ([]*fileserver.FileMeta, error) {
 	if !db.Active || db.DB == nil {

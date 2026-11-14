@@ -33,11 +33,31 @@ type userStore struct {
 
 var globalUsers = &userStore{
 	users: map[string]string{
-		"admin": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9", // admin123
+		"admin":              "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9", // admin123
+		"admin@nazeerdfs.io": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9", // admin123
 	},
 	names: map[string]string{
-		"admin": "Mohammed Nazeer Ali",
+		"admin":              "Mohammed Nazeer Ali",
+		"admin@nazeerdfs.io": "Mohammed Nazeer Ali",
 	},
+}
+
+func (u *userStore) updatePassword(username, newPassHash string) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.users[username] = newPassHash
+}
+
+func (u *userStore) updateProfile(oldUsername, newUsername, newName string) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	passHash := u.users[oldUsername]
+	if newUsername != oldUsername {
+		delete(u.users, oldUsername)
+		delete(u.names, oldUsername)
+	}
+	u.users[newUsername] = passHash
+	u.names[newUsername] = newName
 }
 
 type sessionData struct {
@@ -52,6 +72,15 @@ type sessionStore struct {
 
 var globalSessions = &sessionStore{
 	sessions: make(map[string]sessionData),
+}
+
+func (s *sessionStore) update(token string, user User) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if existing, exists := s.sessions[token]; exists {
+		existing.user = user
+		s.sessions[token] = existing
+	}
 }
 
 func (s *sessionStore) create(user User) (string, error) {

@@ -393,14 +393,14 @@
                         <i data-lucide="chevron-down" class="w-4 h-4 text-app2 hidden md:block"></i>
                     </button>
                     <div id="profileDropdown" class="hidden absolute right-0 mt-2 w-52 card p-1.5 text-sm z-50">
-                        <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                        <a href="settings.html?tab=account" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
                                 data-lucide="user" class="w-4 h-4"></i>Profile</a>
                         <a href="settings.html" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
                                 data-lucide="settings" class="w-4 h-4"></i>Settings</a>
-                        <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
+                        <a href="settings.html?tab=api" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2"><i
                                 data-lucide="key" class="w-4 h-4"></i>API Keys</a>
                         <div class="h-px bg-app my-1"></div>
-                        <a href="#"
+                        <a href="#" id="logoutBtn"
                             class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface2 text-red-500"><i
                                 data-lucide="log-out" class="w-4 h-4"></i>Sign out</a>
                     </div>
@@ -532,47 +532,114 @@
 
                     <!-- TAB 2: ACCOUNT -->
                     <div id="panel-account" class="settings-panel hidden card p-6 space-y-6 fade-in">
-                        <div>
-                            <h3 class="text-base font-bold mb-1">Account & Profile</h3>
-                            <p class="text-xs text-app2">Manage your administrative credentials and security options.</p>
+                        <div class="flex items-center justify-between pb-3 border-b border-app">
+                            <div>
+                                <h3 class="text-base font-bold mb-1">Account & Profile</h3>
+                                <p class="text-xs text-app2">Manage your credentials, profile details, and registered cluster accounts.</p>
+                            </div>
+                            <span id="profileRoleBadgeTop" class="px-2.5 py-1 rounded-full text-xs font-semibold text-brand-500 bg-brand-500/10">Cluster Admin</span>
                         </div>
                         <div class="flex items-center gap-4 pb-4 border-b border-app">
-                            <img src="https://api.dicebear.com/7.x/notionists/svg?seed=MohammedNazeer" class="w-16 h-16 rounded-2xl bg-surface2 p-1 border border-app" alt="Avatar">
+                            <img id="profileAvatarImg" src="https://api.dicebear.com/7.x/notionists/svg?seed=MohammedNazeer" class="w-16 h-16 rounded-2xl bg-surface2 p-1 border border-app shadow-inner" alt="Avatar">
                             <div>
-                                <h4 id="profileName" class="font-bold text-sm user-name-display">Mohammed Nazeer Ali</h4>
-                                <p class="text-xs text-brand-500 font-semibold">Cluster Administrator</p>
-                                <button class="mt-2 text-[11px] px-3 py-1 rounded-lg bg-surface2 hover:bg-surface2/80 border border-app font-medium">Change Avatar</button>
+                                <h4 id="profileName" class="font-bold text-base user-name-display">Mohammed Nazeer Ali</h4>
+                                <div class="flex items-center gap-2 mt-0.5">
+                                    <p id="profileRoleBadge" class="text-xs text-brand-500 font-semibold">Cluster Admin</p>
+                                    <span class="text-xs text-app2">•</span>
+                                    <span id="profileUsernameBadge" class="text-xs text-app2 font-mono">admin</span>
+                                </div>
+                                <span class="inline-block mt-2 text-[10px] text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded font-medium">Session Active</span>
                             </div>
                         </div>
+
+                        <!-- PROFILE DETAILS EDIT -->
                         <div class="space-y-4 text-xs">
-                            <div class="grid grid-cols-2 gap-4">
+                            <h4 class="font-bold text-sm text-app flex items-center gap-2">
+                                <i data-lucide="user" class="w-4 h-4 text-brand-500"></i> Personal Details
+                            </h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block font-semibold text-app2 mb-1">Full Name</label>
-                                    <input type="text" value="Mohammed Nazeer Ali" class="user-name-display w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none">
+                                    <input id="profileFullNameInput" type="text" placeholder="Full Name" value="Mohammed Nazeer Ali" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-medium focus:border-brand-500">
                                 </div>
                                 <div>
-                                    <label class="block font-semibold text-app2 mb-1">Email Address</label>
-                                    <input type="email" value="nazeer@nazeerdfs.io" class="user-email-display w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none">
+                                    <label class="block font-semibold text-app2 mb-1">Username / Email</label>
+                                    <input id="profileEmailInput" type="text" placeholder="Username or Email" value="admin" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-medium focus:border-brand-500">
                                 </div>
                             </div>
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="block font-semibold text-app2 mb-1">Role</label>
-                                    <input type="text" value="Cluster Admin" disabled class="w-full bg-surface2/50 border border-app rounded-xl p-2.5 outline-none font-semibold text-brand-500 opacity-80 cursor-not-allowed">
+                                    <label class="block font-semibold text-app2 mb-1">Assigned Role</label>
+                                    <input id="profileRoleInput" type="text" value="Cluster Admin" disabled class="w-full bg-surface2/50 border border-app rounded-xl p-2.5 outline-none font-semibold text-brand-500 opacity-80 cursor-not-allowed">
                                 </div>
                                 <div>
-                                    <label class="block font-semibold text-app2 mb-1">Organization</label>
-                                    <input type="text" value="Nazeer Systems Corp" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none">
+                                    <label class="block font-semibold text-app2 mb-1">Organization / Department</label>
+                                    <input id="profileOrgInput" type="text" placeholder="Organization" value="Nazeer Systems Corp" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none font-medium focus:border-brand-500">
                                 </div>
                             </div>
-                            <div class="pt-2 border-t border-app">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <p class="font-semibold">Two-Factor Authentication (2FA)</p>
-                                        <p class="text-[11px] text-app2">Secured via TOTP Authenticator App.</p>
-                                    </div>
-                                    <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold text-emerald-500 bg-emerald-500/10">Enabled</span>
+                            <div class="flex justify-end pt-1">
+                                <button id="saveProfileBtn" class="ripple flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-medium text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-brand-500/25 transition-all">
+                                    <i data-lucide="check" class="w-4 h-4"></i>
+                                    <span>Save Profile</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- PASSWORD CHANGE SECTION -->
+                        <div class="pt-4 border-t border-app space-y-4 text-xs">
+                            <h4 class="font-bold text-sm text-app flex items-center gap-2">
+                                <i data-lucide="lock" class="w-4 h-4 text-brand-500"></i> Change Password
+                            </h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block font-semibold text-app2 mb-1">Current Password</label>
+                                    <input id="currPasswordInput" type="password" placeholder="Current password" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none focus:border-brand-500">
                                 </div>
+                                <div>
+                                    <label class="block font-semibold text-app2 mb-1">New Password</label>
+                                    <input id="newPasswordInput" type="password" placeholder="Min 3 characters" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none focus:border-brand-500">
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-app2 mb-1">Confirm New Password</label>
+                                    <input id="confirmPasswordInput" type="password" placeholder="Repeat new password" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none focus:border-brand-500">
+                                </div>
+                            </div>
+                            <div class="flex justify-end pt-1">
+                                <button id="updatePasswordBtn" class="ripple flex items-center gap-2 bg-surface2 hover:bg-surface2/80 border border-app font-medium text-xs px-4 py-2.5 rounded-xl transition-all">
+                                    <i data-lucide="key" class="w-4 h-4 text-brand-500"></i>
+                                    <span>Update Password</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- REGISTERED USERS LIST (Admin View) -->
+                        <div class="pt-4 border-t border-app space-y-3 text-xs">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h4 class="font-bold text-sm text-app flex items-center gap-2">
+                                        <i data-lucide="users" class="w-4 h-4 text-brand-500"></i> Registered Cluster Accounts
+                                    </h4>
+                                    <p class="text-[11px] text-app2">Users who have registered or been provisioned access.</p>
+                                </div>
+                                <span id="userCountBadge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-brand-500/10 text-brand-500">Loading...</span>
+                            </div>
+
+                            <div class="overflow-x-auto rounded-xl border border-app">
+                                <table class="w-full text-left text-xs">
+                                    <thead class="bg-surface2/60 text-app2 border-b border-app font-medium">
+                                        <tr>
+                                            <th class="py-2.5 px-3">User</th>
+                                            <th class="py-2.5 px-3">Username</th>
+                                            <th class="py-2.5 px-3">Role</th>
+                                            <th class="py-2.5 px-3">Joined</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="usersTableBody">
+                                        <tr>
+                                            <td colspan="4" class="py-4 text-center text-app2">Loading cluster users...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -1100,6 +1167,170 @@
                 if (setBar) setBar.style.width = Math.max(usedPct, 0.5) + '%';
             })
             .catch(err => console.error('Error fetching settings stats:', err));
+
+        /* ---------------- PROFILE & ACCOUNT MANAGEMENT ---------------- */
+        async function loadProfile() {
+            try {
+                const res = await fetch('/api/profile');
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.authenticated && data.user) {
+                    const u = data.user;
+                    const name = u.name || 'Mohammed Nazeer Ali';
+                    const username = u.username || 'admin';
+                    const role = u.role || 'Cluster Admin';
+                    const org = data.organization || 'Nazeer Systems Corp';
+
+                    const nameInput = document.getElementById('profileFullNameInput');
+                    if (nameInput) nameInput.value = name;
+                    const emailInput = document.getElementById('profileEmailInput');
+                    if (emailInput) emailInput.value = username;
+                    const roleInput = document.getElementById('profileRoleInput');
+                    if (roleInput) roleInput.value = role;
+                    const orgInput = document.getElementById('profileOrgInput');
+                    if (orgInput) orgInput.value = org;
+
+                    const pName = document.getElementById('profileName');
+                    if (pName) pName.textContent = name;
+                    const pRole = document.getElementById('profileRoleBadge');
+                    if (pRole) pRole.textContent = role;
+                    const pRoleTop = document.getElementById('profileRoleBadgeTop');
+                    if (pRoleTop) pRoleTop.textContent = role;
+                    const pUser = document.getElementById('profileUsernameBadge');
+                    if (pUser) pUser.textContent = username;
+
+                    const avatarImg = document.getElementById('profileAvatarImg');
+                    if (avatarImg) {
+                        avatarImg.src = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(name || username)}`;
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load profile:', err);
+            }
+        }
+
+        async function loadRegisteredUsers() {
+            try {
+                const res = await fetch('/api/users');
+                if (!res.ok) return;
+                const users = await res.json();
+                const tbody = document.getElementById('usersTableBody');
+                const countBadge = document.getElementById('userCountBadge');
+                if (countBadge) countBadge.textContent = `${users.length} active`;
+                if (tbody) {
+                    tbody.innerHTML = users.map(u => `
+                        <tr class="border-b border-app/50 hover:bg-surface2/30 transition-colors">
+                            <td class="py-2.5 px-3 flex items-center gap-2">
+                                <img src="https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(u.fullName || u.username)}" class="w-6 h-6 rounded-full bg-surface2 border border-app">
+                                <span class="font-semibold text-app">${u.fullName || u.username}</span>
+                            </td>
+                            <td class="py-2.5 px-3 font-mono text-app2 text-[11px]">${u.username}</td>
+                            <td class="py-2.5 px-3">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${u.role === 'Cluster Admin' ? 'bg-brand-500/10 text-brand-500' : 'bg-surface2 text-app2'}">${u.role}</span>
+                            </td>
+                            <td class="py-2.5 px-3 text-[11px] text-app2">${u.createdAt || '-'}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (err) {
+                console.error('Failed to load users:', err);
+            }
+        }
+
+        // Save Profile Details
+        const saveProfileBtn = document.getElementById('saveProfileBtn');
+        if (saveProfileBtn) {
+            saveProfileBtn.addEventListener('click', async () => {
+                const name = document.getElementById('profileFullNameInput').value.trim();
+                const email = document.getElementById('profileEmailInput').value.trim();
+                const org = document.getElementById('profileOrgInput').value.trim();
+
+                if (!name || !email) {
+                    showToast('Full Name and Username/Email are required.', 'warning');
+                    return;
+                }
+
+                saveProfileBtn.disabled = true;
+                try {
+                    const res = await fetch('/api/profile', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, email, organization: org })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        showToast('Profile updated successfully!', 'success');
+                        loadProfile();
+                        loadRegisteredUsers();
+                    } else {
+                        showToast(data.message || 'Failed to update profile.', 'warning');
+                    }
+                } catch (err) {
+                    showToast('Network error updating profile.', 'warning');
+                } finally {
+                    saveProfileBtn.disabled = false;
+                }
+            });
+        }
+
+        // Change Password
+        const updatePasswordBtn = document.getElementById('updatePasswordBtn');
+        if (updatePasswordBtn) {
+            updatePasswordBtn.addEventListener('click', async () => {
+                const curr = document.getElementById('currPasswordInput').value;
+                const next = document.getElementById('newPasswordInput').value;
+                const confirm = document.getElementById('confirmPasswordInput').value;
+
+                if (!curr) {
+                    showToast('Please enter your current password.', 'warning');
+                    return;
+                }
+                if (next.length < 3) {
+                    showToast('New password must be at least 3 characters.', 'warning');
+                    return;
+                }
+                if (next !== confirm) {
+                    showToast('New passwords do not match.', 'warning');
+                    return;
+                }
+
+                updatePasswordBtn.disabled = true;
+                try {
+                    const res = await fetch('/api/profile', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ currentPassword: curr, newPassword: next })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        showToast('Password changed successfully!', 'success');
+                        document.getElementById('currPasswordInput').value = '';
+                        document.getElementById('newPasswordInput').value = '';
+                        document.getElementById('confirmPasswordInput').value = '';
+                    } else {
+                        showToast(data.message || 'Failed to update password.', 'warning');
+                    }
+                } catch (err) {
+                    showToast('Network error updating password.', 'warning');
+                } finally {
+                    updatePasswordBtn.disabled = false;
+                }
+            });
+        }
+
+        // Check URL parameters for tab switching (e.g. ?tab=account)
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab') || (window.location.hash ? window.location.hash.substring(1) : null);
+        if (tabParam) {
+            const targetBtn = document.querySelector(`.settings-tab-btn[data-tab="${tabParam}"]`);
+            if (targetBtn) {
+                targetBtn.click();
+            }
+        }
+
+        // Initialize profile and registered accounts
+        loadProfile();
+        loadRegisteredUsers();
     </script>
 </body>
 

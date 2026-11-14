@@ -17,5 +17,7 @@ func RegisterRoutes(mux *http.ServeMux, a *App) {
 	mux.HandleFunc("/api/cluster", a.RequireAuth(a.ClusterHandler))
 	mux.HandleFunc("/api/logs", a.RequireAuth(a.LogsHandler))
 	mux.HandleFunc("/api/settings", a.RequireAuth(a.SettingsHandler))
+	mux.HandleFunc("/api/profile", a.RequireAuth(a.ProfileHandler))
+	mux.HandleFunc("/api/users", a.RequireAuth(a.UsersListHandler))
 }
 

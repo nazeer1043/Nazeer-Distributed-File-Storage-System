@@ -29,20 +29,37 @@ async function checkSession(onSuccess) {
 // Update user profile display names & avatars dynamically
 function updateUserProfile(user) {
     const name = (user && user.name) ? user.name : 'Mohammed Nazeer Ali';
-    const email = (user && user.username) ? user.username : 'nazeer@nazeerdfs.io';
+    const email = (user && user.username) ? user.username : 'admin';
+    const role = (user && user.role) ? user.role : 'Cluster Admin';
 
     document.querySelectorAll('.user-name-display, #sidebarUserName, #headerUserName, #profileName, #propOwner').forEach(el => {
-        el.textContent = name;
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+            el.value = name;
+        } else {
+            el.textContent = name;
+        }
     });
 
     document.querySelectorAll('.user-email-display, #profileEmail').forEach(el => {
-        el.value = email;
-        if (el.tagName !== 'INPUT') el.textContent = email;
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+            el.value = email;
+        } else {
+            el.textContent = email;
+        }
     });
 
-    // Update avatar seeds
+    document.querySelectorAll('.user-role-display, #profileRoleBadge, #sidebarUserRole').forEach(el => {
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+            el.value = role;
+        } else {
+            el.textContent = role;
+        }
+    });
+
+    // Update avatar seeds with logged-in user identity
+    const seed = encodeURIComponent(name || email || 'MohammedNazeer');
     document.querySelectorAll('img[src*="api.dicebear.com"]').forEach(img => {
-        img.src = 'https://api.dicebear.com/7.x/notionists/svg?seed=MohammedNazeer';
+        img.src = `https://api.dicebear.com/7.x/notionists/svg?seed=${seed}`;
     });
 }
 
