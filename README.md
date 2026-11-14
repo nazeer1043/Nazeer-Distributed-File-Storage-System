@@ -116,7 +116,10 @@ go vet ./...
 ## Documentation
 
 - [**System Architecture**](ARCHITECTURE.md) — Comprehensive technical design, CAS specification, P2P binary framing wire format, and quorum replication.
+- [**REST API Reference**](API.md) — Detailed endpoint documentation, double-submit CSRF, request/response models, and curl examples.
+- [**User & Administrator Guide**](USER_GUIDE.md) — Web console walkthrough, file management, upload center, role administration, and Google Drive setup.
 - [**Operations Runbook**](RUNBOOK.md) — Production setup, Docker Compose, Render deployment, monitoring, telemetry, and disaster recovery.
+- [**Developer & Contributor Guide**](DEVELOPER_GUIDE.md) — Code organization, multi-process testing, fuzzing, and security audits.
 - [**Security Policy & Threat Model**](SECURITY.md) — Threat model, cryptographic primitives, authentication, and zero-downtime key rotation guide.
 - [**Status & Limitations**](STATUS.md) — Verified production readiness checklist and documented architectural boundaries.
 
