@@ -107,8 +107,8 @@ func main() {
 
 	mux.Handle("/", staticHandler)
 
-	// Apply defense-in-depth security headers and anti-CSRF token verification
-	secureHandler := api.SecurityHeadersMiddleware(api.CSRFMiddleware(mux))
+	// Apply defense-in-depth structured logging, security headers and anti-CSRF token verification
+	secureHandler := api.StructuredLoggingMiddleware(api.SecurityHeadersMiddleware(api.CSRFMiddleware(mux)))
 
 	httpPort := cfg.HTTPPort
 	if p := os.Getenv("PORT"); p != "" {

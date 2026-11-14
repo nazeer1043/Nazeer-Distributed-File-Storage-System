@@ -417,3 +417,59 @@ func TestApp_NodeRouting_ConsistentHashingAndRoundRobin(t *testing.T) {
 	assert.Len(t, healthyAfterStop, 1)
 	assert.Equal(t, srv2.ListenAddr, healthyAfterStop[0].ListenAddr)
 }
+
+func TestApp_Healthz_Readyz_Metrics_And_Logging(t *testing.T) {
+	srv, cleanup := createTestServer(t)
+	defer cleanup()
+
+	app := &App{
+		Servers:   []*fileserver.FileServer{srv},
+		DB:        &db.DBWrapper{DB: nil, Active: false},
+		StartTime: time.Now().Add(-10 * time.Minute),
+	}
+
+	// 1. Healthz (liveness)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	rec := httptest.NewRecorder()
+	app.HealthzHandler(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"status":"alive"`)
+
+	// 2. Readyz (readiness)
+	reqReady := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	recReady := httptest.NewRecorder()
+	app.ReadyzHandler(recReady, reqReady)
+	assert.Equal(t, http.StatusOK, recReady.Code)
+	assert.Contains(t, recReady.Body.String(), `"status":"ready"`)
+
+	// 3. Readyz failure when no healthy servers
+	srv.Stop()
+	recReadyFail := httptest.NewRecorder()
+	app.ReadyzHandler(recReadyFail, reqReady)
+	assert.Equal(t, http.StatusServiceUnavailable, recReadyFail.Code)
+	assert.Contains(t, recReadyFail.Body.String(), `"status":"not_ready"`)
+
+	// 4. Prometheus metrics exposition
+	reqMetrics := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	recMetrics := httptest.NewRecorder()
+	app.MetricsHandler(recMetrics, reqMetrics)
+	assert.Equal(t, http.StatusOK, recMetrics.Code)
+	bodyStr := recMetrics.Body.String()
+	assert.Contains(t, bodyStr, "nazeerdfs_uptime_seconds")
+	assert.Contains(t, bodyStr, "nazeerdfs_active_nodes")
+	assert.Contains(t, bodyStr, "nazeerdfs_total_nodes")
+
+	// 5. Structured logging middleware and request ID propagation
+	handler := StructuredLoggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqID := GetRequestID(r.Context())
+		assert.NotEmpty(t, reqID)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+
+	recLog := httptest.NewRecorder()
+	reqLog := httptest.NewRequest(http.MethodGet, "/test-log?token=secret123&pass=mypass", nil)
+	handler.ServeHTTP(recLog, reqLog)
+	assert.Equal(t, http.StatusOK, recLog.Code)
+	assert.NotEmpty(t, recLog.Header().Get("X-Request-ID"))
+}

@@ -99,7 +99,7 @@ func main() {
 	})
 	mux.Handle("/", staticHandler)
 
-	secureHandler := api.SecurityHeadersMiddleware(api.CSRFMiddleware(mux))
+	secureHandler := api.StructuredLoggingMiddleware(api.SecurityHeadersMiddleware(api.CSRFMiddleware(mux)))
 
 	httpPort := cfg.HTTPPort
 	if p := os.Getenv("PORT"); p != "" {

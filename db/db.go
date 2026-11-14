@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yigithankarabulut/distributed-file-storage/config"
 	"github.com/yigithankarabulut/distributed-file-storage/fileserver"
+	"github.com/yigithankarabulut/distributed-file-storage/migrations"
 )
 
 // DBWrapper wraps the *sql.DB connection instance.
@@ -44,6 +45,7 @@ func Connect(cfg *config.Config) *DBWrapper {
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(10)
 	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetConnMaxIdleTime(2 * time.Minute)
 
 	if err := db.Ping(); err != nil {
 		log.Printf("[MySQL] Warning: Could not connect to MySQL database at DSN (%v). Running without database persistence.\n", err)
@@ -51,6 +53,9 @@ func Connect(cfg *config.Config) *DBWrapper {
 	}
 
 	log.Printf("[MySQL] Successfully connected to database.\n")
+	if err := migrations.RunMigrations(db); err != nil {
+		log.Printf("[MySQL] Migration notice: %v\n", err)
+	}
 	return &DBWrapper{DB: db, Active: true}
 }
 

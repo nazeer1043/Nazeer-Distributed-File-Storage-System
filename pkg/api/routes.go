@@ -19,4 +19,9 @@ func RegisterRoutes(mux *http.ServeMux, a *App) {
 	mux.HandleFunc("/api/settings", a.RequireAdmin(a.SettingsHandler))
 	mux.HandleFunc("/api/profile", a.RequireAuth(a.ProfileHandler))
 	mux.HandleFunc("/api/users", a.RequireAdmin(a.UsersListHandler))
+
+	// Operational Telemetry, Probes & Prometheus Metrics
+	mux.HandleFunc("/healthz", a.HealthzHandler)
+	mux.HandleFunc("/readyz", a.ReadyzHandler)
+	mux.HandleFunc("/metrics", a.MetricsHandler)
 }
