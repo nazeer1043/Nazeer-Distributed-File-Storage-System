@@ -1,79 +1,124 @@
-# Distributed File Storage in Go
+# NazeerDFS — Distributed File Storage System
 
-Build a decentralized, fully distributed, content-addressable file storage system using Go that can handle and stream very large files. This project covers system design, low-level programming, and network protocols, all while building a highly practical and scalable application.
+[![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Table of Contents
-- [Introduction](#introduction)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Example Usage](#example-usage)
-- [Reference](#reference)
-- [Contributing](#contributing)
-- [License](#license)
+NazeerDFS is a decentralized, content-addressed peer-to-peer (P2P) file storage system implemented in Go. It provides chunked local data distribution across cluster nodes, authenticated AES-256-GCM encryption, optional Google Drive cloud backup fallback, MySQL metadata persistence, and an enterprise web management console.
 
-## Introduction
-This project aims to create a decentralized, fully distributed, content-addressable file storage system using Go. The system is designed to handle and stream very large files efficiently. Key features and concepts covered in this project include:
+---
 
-- **Decentralization**: The file storage system does not rely on a central server. Instead, it uses a peer-to-peer (P2P) network where each node can store and share files.
-- **File Server**: Manages file storage, retrieval, and deletion. Each file server operates independently but can communicate with other file servers in the network.
-- **File Storage and Retrieval**: The project covers efficient methods for storing, retrieving, and deleting files in a distributed environment.
-- **TCP Transport Layer**: Custom TCP transport is used for peer-to-peer communication, including custom decoders and handshake functions.
-- **Low-Level Programming**: The project involves low-level programming techniques in Go, providing a deep understanding of system-level operations and memory management.
-- **Network Protocols**: The system uses custom network protocols for efficient data transfer and communication between nodes. TCP is the primary transport layer used.
-- **Peer-to-Peer Communication**: Nodes in the network communicate directly with each other to exchange files and information. This involves implementing custom P2P communication protocols.
-- **Content Addressable Storage (CAS)**: Uses CAS mechanisms to ensure that each piece of data is uniquely identified and stored based on its content.
-- **Streaming and Caching**: Techniques for streaming large files and caching frequently accessed data to improve performance are implemented.
-- **Encryption and Security**: Files are encrypted to ensure data security and privacy during storage and transmission.
-- **Bootstrap Nodes**: Initial nodes used to join the P2P network and discover other nodes.
+## Architecture Overview
 
-
-## Installation
-To install and set up this project, follow these steps:
-
-1. **Clone the repository:**
-    ```sh
-    git clone https://github.com/yigithankarabulut/distributed-file-storage.git
-    cd distributed-file-storage
-    ```
-
-2. **Install dependencies:**
-    ```sh
-    go mod download
-    ```
-
-## Usage
-We have some make commands, use the following commands:
-
-```sh
-make build
-make run
-make test
+```
+                        +---------------------------+
+                        |      Web UI / Client      |
+                        +-------------+-------------+
+                                      | HTTP REST
+                                      v
+                        +---------------------------+
+                        |   NazeerDFS HTTP / API    |
+                        +-------------+-------------+
+                                      |
+            +-------------------------+-------------------------+
+            |                         |                         |
+            v                         v                         v
++-----------------------+ +-----------------------+ +-----------------------+
+|  Storage Node (:3000) | |  Storage Node (:4000) | |  Storage Node (:5000) |
+|   Local CAS Store     | |   Local CAS Store     | |   Local CAS Store     |
++-----------+-----------+ +-----------+-----------+ +-----------+-----------+
+            ^                         ^                         ^
+            +================== P2P Mesh =======================+
+                                      |
+                                      v (Fallback)
+                        +---------------------------+
+                        |  Google Drive Cloud Tier  |
+                        +---------------------------+
 ```
 
-## Example Usage
-The main program sets up multiple file servers on different ports, demonstrating how they interact and handle file operations. Here's a brief overview of what happens in the `main.go` file:
+- **Content-Addressable Storage (CAS):** Files are chunked and placed into directory trees determined by SHA-256 digests (`CASPathTransformFunc`), preventing single-folder inode saturation.
+- **P2P Transport Mesh:** Custom TCP transport layer using framed binary protocols for node discovery, synchronization, and streaming replication.
+- **Data Protection:** Files are encrypted at rest using authenticated chunked encryption with persistent 32-byte keys.
+- **Dual-Tier Resilience:** If a requested file chunk is missing across all local peer nodes, NazeerDFS falls back to an encrypted Google Drive vault.
+- **MySQL Metadata & Auth:** Stores user accounts, sessions, access control rules, file checksums, and audit logs.
 
-- Three file servers are created on different ports (`:3000`, `:4000`, and `:5000`).
-- The servers are interconnected, with the third server (`:5000`) knowing about the first two servers (`:3000`, `:4000`).
-- The servers start running in separate goroutines.
-- The main program performs file storage and retrieval operations, demonstrating the system's functionality.
+---
 
-This project provides a comprehensive example of building a distributed file storage system from scratch, leveraging Go's capabilities for low-level programming and efficient network communication.
+## Quickstart
 
-## Reference
-Thanks to Anthony GG.
-- [Anthony GG's GitHub Repository](https://github.com/anthdm/distributedfilesystemgo)
-- [YouTube Tutorial](https://www.youtube.com/watch?v=IoY6bE--A54)
+### Prerequisites
+- Go 1.22 or later
+- MySQL 8.0+ (optional; an in-memory fallback runs automatically for local development)
+- Git
 
+### 1. Clone & Setup
+```bash
+git clone https://github.com/nazeer1043/Nazeer-Distributed-File-Storage-System.git
+cd Nazeer-Distributed-File-Storage-System
+cp .env.example .env
+```
 
-## Contributing
-Contributions are welcome! Please follow these steps to contribute:
+### 2. Configure Environment
+Edit `.env` to supply an encryption key and cluster secrets:
+```bash
+# Generate a 32-byte Base64 key:
+# openssl rand -base64 32
+ENCRYPTION_KEY=<your-base64-key>
+CLUSTER_SECRET=<your-cluster-secret>
+```
 
-Fork the repository.\
-Create a new branch (git checkout -b feature/YourFeature).\
-Commit your changes (git commit -m 'Add some feature').\
-Push to the branch (git push origin feature/YourFeature).\
-Open a pull request.
+### 3. Run Locally
+```bash
+go run cmd/main.go
+```
+The HTTP web console and API will start at `http://localhost:8080`.
+
+### 4. Run with Docker Compose
+```bash
+docker compose up -d --build
+```
+
+---
+
+## Configuration Reference
+
+Configuration is managed entirely through environment variables. See [`.env.example`](.env.example) for defaults.
+
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `APP_ENV` | Application environment (`development`, `production`) | `development` |
+| `PORT` / `HTTP_PORT` | HTTP server port | `8080` |
+| `NODE_LISTEN_ADDRS` | Comma-separated TCP listen addresses for P2P nodes | `:3000,:4000,:5000` |
+| `STORAGE_ROOTS` | Comma-separated paths for local storage directories | `3000_network,4000_network,5000_network` |
+| `BOOTSTRAP_NODES` | P2P seed nodes for discovery | `:3000,:4000` |
+| `ENCRYPTION_KEY` | Base64-encoded 32-byte master encryption key | *(required in production)* |
+| `CLUSTER_SECRET` | Secret string for node-to-node mutual authentication | *(required in production)* |
+| `ADMIN_BOOTSTRAP_PASSWORD` | Initial admin account password (min 12 chars) | — |
+| `MYSQL_DSN` | MySQL database connection string | `root:@tcp(127.0.0.1:3306)/nazeerdfs?parseTime=true` |
+| `CREDENTIALS_JSON` | Google Cloud service account or OAuth credentials JSON | — |
+| `TOKEN_JSON` | Google Drive OAuth refresh token JSON | — |
+
+---
+
+## Testing & Verification
+
+Run the full test suite with data race detection:
+```bash
+go test -race -v ./...
+```
+
+Run linter and static analysis:
+```bash
+go vet ./...
+```
+
+---
+
+## Status & Limitations
+
+See [`STATUS.md`](STATUS.md) for current engineering limits and design trade-offs.
+
+---
 
 ## License
-This project is licensed under the MIT License. See the LICENSE file for details.
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

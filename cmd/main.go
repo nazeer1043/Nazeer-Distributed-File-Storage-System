@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/yigithankarabulut/distributed-file-storage/config"
-	"github.com/yigithankarabulut/distributed-file-storage/crypto"
 	"github.com/yigithankarabulut/distributed-file-storage/db"
 	"github.com/yigithankarabulut/distributed-file-storage/fileserver"
 	"github.com/yigithankarabulut/distributed-file-storage/p2p"
@@ -41,7 +40,7 @@ func killProcessOnPort(port string) {
 	time.Sleep(100 * time.Millisecond)
 }
 
-func makeServer(listenAddr string, encryptKey []byte, nodes ...string) *fileserver.FileServer {
+func makeServer(listenAddr string, storageRoot string, encryptKey []byte, nodes ...string) *fileserver.FileServer {
 	tcpTransport := p2p.NewTCPTransport(
 		p2p.WithListenAddr(listenAddr),
 		p2p.WithHandshakeFunc(p2p.NOPHandshakeFunc),
@@ -51,7 +50,7 @@ func makeServer(listenAddr string, encryptKey []byte, nodes ...string) *fileserv
 	fileServerOpts := fileserver.ServerOpts{
 		ListenAddr:        listenAddr,
 		EncryptKey:        encryptKey,
-		StorageRoot:       strings.TrimPrefix(listenAddr, ":") + "_network",
+		StorageRoot:       storageRoot,
 		PathTransformFunc: store.CASPathTransformFunc,
 		Transport:         tcpTransport,
 		BootstrapNodes:    nodes,
@@ -63,23 +62,38 @@ func makeServer(listenAddr string, encryptKey []byte, nodes ...string) *fileserv
 }
 
 func main() {
-	cfg := config.LoadConfig()
-
-	encryptKey, err := crypto.NewEncryptionKey()
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Fatal configuration error: %v", err)
 	}
 
-	// Kill any existing processes on the ports we'll use
-	for _, port := range append(cfg.NodePorts, cfg.HTTPPort) {
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("Configuration validation failed: %v", err)
+	}
+
+	encryptKey := cfg.EncryptionKey
+
+	// Kill any existing processes on the ports we'll use (windows dev only)
+	var allPorts []string
+	for _, addr := range cfg.NodeListenAddrs {
+		allPorts = append(allPorts, strings.TrimPrefix(addr, ":"))
+	}
+	allPorts = append(allPorts, cfg.HTTPPort)
+	for _, port := range allPorts {
 		killProcessOnPort(port)
 	}
 
-	s1 := makeServer(":"+cfg.NodePorts[0], encryptKey, "")
-	s2 := makeServer(":"+cfg.NodePorts[1], encryptKey, "")
-	s3 := makeServer(":"+cfg.NodePorts[2], encryptKey, ":"+cfg.NodePorts[0], ":"+cfg.NodePorts[1])
+	var servers []*fileserver.FileServer
+	for i, addr := range cfg.NodeListenAddrs {
+		storageRoot := cfg.StorageRoots[i]
+		var bootstraps []string
+		if i > 0 {
+			bootstraps = cfg.BootstrapNodes
+		}
+		s := makeServer(addr, storageRoot, encryptKey, bootstraps...)
+		servers = append(servers, s)
+	}
 
-	servers := []*fileserver.FileServer{s1, s2, s3}
 	for i, srv := range servers {
 		go func(s *fileserver.FileServer, index int) {
 			if err := s.Start(); err != nil {

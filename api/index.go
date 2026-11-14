@@ -20,10 +20,19 @@ var (
 )
 
 func init() {
-	cfg := config.LoadConfig()
-	encryptKey, _ := crypto.NewEncryptionKey()
+	cfg, _ := config.LoadConfig()
+	var encryptKey []byte
+	if cfg != nil && len(cfg.EncryptionKey) == 32 {
+		encryptKey = cfg.EncryptionKey
+	} else {
+		encryptKey, _ = crypto.NewEncryptionKey()
+	}
 
-	gdriveStore := store.NewGDriveStore("credentials.json", store.DefaultVaultFolderName)
+	credsPath := "credentials.json"
+	if cfg != nil && cfg.CredentialsPath != "" {
+		credsPath = cfg.CredentialsPath
+	}
+	gdriveStore := store.NewGDriveStore(credsPath, store.DefaultVaultFolderName)
 
 	tmpDir := os.TempDir()
 	s1 := makeServerNode(":3000", filepath.Join(tmpDir, "3000_network"), encryptKey, gdriveStore)

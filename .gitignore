@@ -1,3 +1,4 @@
+# Binaries and build artifacts
 *.exe
 *.exe~
 *.dll
@@ -6,22 +7,30 @@
 *.winmd
 *.test
 *.out
-*.iml
-*.ipr
-*.iws
-.idea/
+main
+main.exe
+/bin/
 /build/
 /dist/
 /out/
-go.work
-/bin/
-main
-main.exe
 
-# Temporary Local CAS Network Stores
+# IDE and tooling
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+go.work
+
+# Temporary Local CAS Network Stores and Data
 *_network/
 store/store/
+data/
+tmp/
 
-# Secret API Keys & OAuth Tokens (Render Secret Environment)
+# Secret API Keys, OAuth Tokens, and Environment Files
 credentials.json
 token.json
+.env
+.env.*
+!.env.example

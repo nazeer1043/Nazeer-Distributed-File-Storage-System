@@ -21,9 +21,17 @@ type DBWrapper struct {
 
 // Connect initializes a connection to the MySQL database.
 func Connect(cfg *config.Config) *DBWrapper {
-	// Build MySQL DSN: user:pass@tcp(host:port)/dbname?parseTime=true
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
-		cfg.DBUser, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	dsn := ""
+	if cfg != nil {
+		dsn = cfg.MySQLDSN
+		if dsn == "" && cfg.DBUser != "" {
+			dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
+				cfg.DBUser, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
+		}
+	}
+	if dsn == "" {
+		dsn = "root:@tcp(127.0.0.1:3306)/nazeerdfs?parseTime=true"
+	}
 
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -36,13 +44,11 @@ func Connect(cfg *config.Config) *DBWrapper {
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	if err := db.Ping(); err != nil {
-		log.Printf("[MySQL] Warning: Could not connect to MySQL database at %s:%s/%s (%v). Running without database persistence.\n",
-			cfg.DBHost, cfg.DBPort, cfg.DBName, err)
+		log.Printf("[MySQL] Warning: Could not connect to MySQL database at DSN (%v). Running without database persistence.\n", err)
 		return &DBWrapper{DB: db, Active: false}
 	}
 
-	log.Printf("[MySQL] Successfully connected to database: %s@tcp(%s:%s)/%s\n",
-		cfg.DBUser, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	log.Printf("[MySQL] Successfully connected to database.\n")
 	return &DBWrapper{DB: db, Active: true}
 }
 
