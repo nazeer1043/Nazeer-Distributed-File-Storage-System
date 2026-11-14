@@ -104,7 +104,8 @@ func (s *Store) WriteDecrypt(encryptKey []byte, id, key string, r io.Reader) (in
 	n, err := crypto.CopyDecrypt(encryptKey, r, f)
 	return int64(n), err
 }
-func (s *Store) openFileForWriting(id, key string) (*os.File, error) {
+// OpenFileForWriting creates directories and opens the file for streaming writes.
+func (s *Store) OpenFileForWriting(id, key string) (*os.File, error) {
 	pathKey := s.PathTransformFunc(key)
 	pathNameWithRoot := fmt.Sprintf("%s/%s/%s", s.Root, id, pathKey.PathName)
 	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil { //nolint:gosec
@@ -114,6 +115,10 @@ func (s *Store) openFileForWriting(id, key string) (*os.File, error) {
 	fullPathWithRoot := fmt.Sprintf("%s/%s/%s", s.Root, id, pathKey.FullPath())
 
 	return os.Create(fullPathWithRoot) //nolint:gosec
+}
+
+func (s *Store) openFileForWriting(id, key string) (*os.File, error) {
+	return s.OpenFileForWriting(id, key)
 }
 
 func (s *Store) writeStream(id, key string, r io.Reader) (int64, error) {

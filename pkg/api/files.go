@@ -24,8 +24,23 @@ type FileItem struct {
 	Encryption string `json:"encryption"`
 	Downloads  string `json:"downloads"`
 	Location   string `json:"location"`
+	RefCount   int    `json:"refCount"`
 }
 
+func formatSize(bytes int64) string {
+	sizeMB := float64(bytes) / (1024 * 1024)
+	if sizeMB >= 1024 {
+		return fmt.Sprintf("%.2f GB", sizeMB/1024)
+	} else if sizeMB >= 1 {
+		return fmt.Sprintf("%.1f MB", sizeMB)
+	} else if bytes > 0 {
+		return fmt.Sprintf("%.1f KB", float64(bytes)/1024)
+	}
+	return "0 B"
+}
+
+// FilesHandler lists stored files. MySQL serves as the primary source of truth,
+// with local metadata.json retained as an optional development fallback.
 func (a *App) FilesHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -44,54 +59,13 @@ func (a *App) FilesHandler(w http.ResponseWriter, r *http.Request) {
 	seenKeys := make(map[string]bool)
 	idCounter := 1
 
-	for _, srv := range a.Servers {
-		if srv != nil && srv.Metadata != nil {
-			metaList := srv.Metadata.List()
-			for _, m := range metaList {
-				if !isAdmin && m.Owner != user.Username {
-					continue
-				}
-				if seenKeys[m.Key] {
-					continue
-				}
-				seenKeys[m.Key] = true
-
-				sizeMB := float64(m.Size) / (1024 * 1024)
-				sizeStr := "0 B"
-				if sizeMB >= 1024 {
-					sizeStr = fmt.Sprintf("%.2f GB", sizeMB/1024)
-				} else if sizeMB >= 1 {
-					sizeStr = fmt.Sprintf("%.1f MB", sizeMB)
-				} else if m.Size > 0 {
-					sizeStr = fmt.Sprintf("%.1f KB", float64(m.Size)/1024)
-				}
-
-				result = append(result, FileItem{
-					ID:         idCounter,
-					Name:       m.Filename,
-					Size:       sizeStr,
-					RawSize:    m.Size,
-					Category:   "Documents",
-					Owner:      m.Owner,
-					Node:       srv.ListenAddr,
-					NodeColor:  "text-brand-500 bg-brand-500/10",
-					Replicas:   "3/3",
-					Status:     "Healthy",
-					Modified:   m.UploadTime.Format("2006-01-02 15:04"),
-					Icon:       "file-text",
-					IconColor:  "text-brand-500",
-					Checksum:   m.Checksum,
-					Encryption: "AES-256-GCM",
-					Downloads:  "0",
-					Location:   m.Key,
-				})
-				idCounter++
-			}
-		}
+	nodeAddr := ":3000"
+	if len(a.Servers) > 0 {
+		nodeAddr = a.Servers[0].ListenAddr
 	}
 
-	// If local metadata is empty, fallback to querying MySQL records
-	if len(result) == 0 && a.DB != nil && a.DB.Active {
+	// 1. MySQL is the primary source of truth for metadata
+	if a.DB != nil && a.DB.Active {
 		if dbFiles, err := a.DB.GetFileRecords(); err == nil {
 			for _, m := range dbFiles {
 				if !isAdmin && m.Owner != user.Username {
@@ -102,25 +76,10 @@ func (a *App) FilesHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				seenKeys[m.Key] = true
 
-				sizeMB := float64(m.Size) / (1024 * 1024)
-				sizeStr := "0 B"
-				if sizeMB >= 1024 {
-					sizeStr = fmt.Sprintf("%.2f GB", sizeMB/1024)
-				} else if sizeMB >= 1 {
-					sizeStr = fmt.Sprintf("%.1f MB", sizeMB)
-				} else if m.Size > 0 {
-					sizeStr = fmt.Sprintf("%.1f KB", float64(m.Size)/1024)
-				}
-
-				nodeAddr := ":3000"
-				if len(a.Servers) > 0 {
-					nodeAddr = a.Servers[0].ListenAddr
-				}
-
 				result = append(result, FileItem{
 					ID:         idCounter,
 					Name:       m.Filename,
-					Size:       sizeStr,
+					Size:       formatSize(m.Size),
 					RawSize:    m.Size,
 					Category:   "Documents",
 					Owner:      m.Owner,
@@ -135,6 +94,51 @@ func (a *App) FilesHandler(w http.ResponseWriter, r *http.Request) {
 					Encryption: "AES-256-GCM",
 					Downloads:  "0",
 					Location:   m.Key,
+					RefCount:   m.RefCount,
+				})
+				idCounter++
+			}
+
+			if result == nil {
+				result = []FileItem{}
+			}
+			json.NewEncoder(w).Encode(result)
+			return
+		}
+	}
+
+	// 2. Development fallback: local metadata.json
+	for _, srv := range a.Servers {
+		if srv != nil && srv.Metadata != nil {
+			metaList := srv.Metadata.List()
+			for _, m := range metaList {
+				if !isAdmin && m.Owner != user.Username {
+					continue
+				}
+				if seenKeys[m.Key] {
+					continue
+				}
+				seenKeys[m.Key] = true
+
+				result = append(result, FileItem{
+					ID:         idCounter,
+					Name:       m.Filename,
+					Size:       formatSize(m.Size),
+					RawSize:    m.Size,
+					Category:   "Documents",
+					Owner:      m.Owner,
+					Node:       srv.ListenAddr,
+					NodeColor:  "text-brand-500 bg-brand-500/10",
+					Replicas:   "3/3",
+					Status:     "Healthy",
+					Modified:   m.UploadTime.Format("2006-01-02 15:04"),
+					Icon:       "file-text",
+					IconColor:  "text-brand-500",
+					Checksum:   m.Checksum,
+					Encryption: "AES-256-GCM",
+					Downloads:  "0",
+					Location:   m.Key,
+					RefCount:   m.RefCount,
 				})
 				idCounter++
 			}
@@ -147,4 +151,3 @@ func (a *App) FilesHandler(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(result)
 }
-

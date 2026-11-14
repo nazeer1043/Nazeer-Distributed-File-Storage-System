@@ -3,6 +3,7 @@ package api
 import (
 	"time"
 
+	"github.com/yigithankarabulut/distributed-file-storage/config"
 	"github.com/yigithankarabulut/distributed-file-storage/db"
 	"github.com/yigithankarabulut/distributed-file-storage/fileserver"
 )
@@ -11,6 +12,7 @@ import (
 type App struct {
 	Servers   []*fileserver.FileServer
 	DB        *db.DBWrapper
+	Cfg       *config.Config
 	StartTime time.Time
 }
 

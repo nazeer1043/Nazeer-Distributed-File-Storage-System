@@ -81,27 +81,37 @@ func (a *App) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	targetFilename := meta.Filename
 
-	// Delete locally and broadcast P2P deletion across all nodes
-	for _, srv := range a.Servers {
-		if srv != nil {
-			_ = srv.Delete(key)
+	shouldPurge := true
+	if a.DB != nil && a.DB.Active {
+		purge, err := a.DB.DecrementOrDeleteFileRecord(key)
+		if err == nil {
+			shouldPurge = purge
 		}
 	}
 
-	LogEvent("WARN", fmt.Sprintf("File '%s' (key: %s) deleted from cluster by %s", targetFilename, key, user.Username))
+	if shouldPurge {
+		// Purge locally and broadcast P2P deletion across all nodes
+		for _, srv := range a.Servers {
+			if srv != nil {
+				_ = srv.Delete(key)
+			}
+		}
+		LogEvent("WARN", fmt.Sprintf("File '%s' (key: %s) completely purged from cluster by %s", targetFilename, key, user.Username))
+	} else {
+		LogEvent("INFO", fmt.Sprintf("File '%s' (key: %s) reference decremented by %s; other references remain active", targetFilename, key, user.Username))
+	}
 
 	if a.DB != nil && a.DB.Active {
-		_ = a.DB.DeleteFileRecord(key)
 		listenAddr := ":3000"
 		if len(a.Servers) > 0 {
 			listenAddr = a.Servers[0].ListenAddr
 		}
-		a.DB.InsertAuditLog("WARN", listenAddr, fmt.Sprintf("File '%s' (key: %s) deleted by %s", targetFilename, key, user.Username))
+		a.DB.InsertAuditLog("WARN", listenAddr, fmt.Sprintf("File '%s' (key: %s) deleted/dereferenced by %s", targetFilename, key, user.Username))
 	}
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(DeleteResponse{
 		Success: true,
-		Message: "File successfully purged from storage.",
+		Message: "File successfully purged or dereferenced.",
 	})
 }

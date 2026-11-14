@@ -20,6 +20,7 @@ type FileMeta struct {
 	UploadTime  time.Time `json:"uploadTime"`
 	NodeID      string    `json:"nodeId"`
 	Replicas    int       `json:"replicas"`
+	RefCount    int       `json:"refCount"`
 }
 
 // MetadataStore handles thread-safe persistent metadata storage per server node.
@@ -97,11 +98,19 @@ func (ms *MetadataStore) saveLocked() error {
 	return os.Rename(tmpFile, ms.filePath)
 }
 
-// Put adds or updates a file metadata record.
+// Put adds or updates a file metadata record. If the key already exists, RefCount is incremented.
 func (ms *MetadataStore) Put(meta *FileMeta) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
+	if existing, exists := ms.entries[meta.Key]; exists {
+		existing.RefCount++
+		return ms.saveLocked()
+	}
+
+	if meta.RefCount <= 0 {
+		meta.RefCount = 1
+	}
 	ms.entries[meta.Key] = meta
 	return ms.saveLocked()
 }
@@ -116,6 +125,25 @@ func (ms *MetadataStore) Get(key string) (*FileMeta, bool) {
 		return nil, false
 	}
 	return meta, true
+}
+
+// DecrementOrDelete decrements the reference count of the key.
+// Returns shouldPurge=true and removes the entry when the reference count drops to 0 or below.
+func (ms *MetadataStore) DecrementOrDelete(key string) (bool, error) {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
+	existing, exists := ms.entries[key]
+	if !exists {
+		return false, nil
+	}
+
+	existing.RefCount--
+	if existing.RefCount <= 0 {
+		delete(ms.entries, key)
+		return true, ms.saveLocked()
+	}
+	return false, ms.saveLocked()
 }
 
 // Delete removes a file metadata record by key.

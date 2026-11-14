@@ -2,10 +2,8 @@ package fileserver
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -230,32 +228,33 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 }
 
 // Store stores the data in the file server.
-// It encrypts the data before writing to local disk (data at rest is never plaintext),
-// and replicates the ciphertext to connected peers.
+// It encrypts the data directly into disk storage via streaming (data at rest is never plaintext),
+// and replicates the ciphertext to connected peers without keeping whole-file buffers in memory.
 func (s *FileServer) Store(key string, r io.Reader) error {
-	encBuf := new(bytes.Buffer)
+	f, err := s.Storage.OpenFileForWriting(s.ID, key)
+	if err != nil {
+		return fmt.Errorf("failed to open storage file: %w", err)
+	}
+
 	keyID := s.KeyID
 	if keyID == "" {
 		keyID = "k1"
 	}
-	encSize, err := crypto.EncryptStream(s.EncryptKey, keyID, r, encBuf)
+
+	encSize, err := crypto.EncryptStream(s.EncryptKey, keyID, r, f)
+	closeErr := f.Close()
 	if err != nil {
 		return fmt.Errorf("encryption error: %w", err)
 	}
-
-	encBytes := encBuf.Bytes()
-
-	// 1. Write encrypted ciphertext to local disk storage
-	size, err := s.Storage.Write(s.ID, key, bytes.NewReader(encBytes))
-	if err != nil {
-		return err
+	if closeErr != nil {
+		return fmt.Errorf("failed to close storage file: %w", closeErr)
 	}
 
 	msg := Message{
 		Payload: MessageStoreFile{
 			ID:   s.ID,
 			Key:  crypto.HashKey(key),
-			Size: size,
+			Size: encSize,
 		},
 	}
 
@@ -279,8 +278,19 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 	mw := io.MultiWriter(writers...)
 	_, _ = mw.Write([]byte{p2p.IncomingStream})
 
-	// 2. Replicate encrypted ciphertext directly over P2P mesh
-	n, err := io.Copy(mw, bytes.NewReader(encBytes))
+	// Replicate encrypted ciphertext directly from local disk over P2P mesh
+	_, encReader, err := s.Storage.Read(s.ID, key)
+	if err != nil {
+		log.Printf("[%s] warning: failed to open stored ciphertext for replication: %v\n", s.Transport.Addr(), err)
+		return nil
+	}
+	defer func() {
+		if rc, ok := encReader.(io.ReadCloser); ok {
+			rc.Close()
+		}
+	}()
+
+	n, err := io.Copy(mw, encReader)
 	if err != nil {
 		log.Printf("[%s] warning: peer replication error: %v (file stored locally)\n", s.Transport.Addr(), err)
 	} else {
@@ -291,31 +301,24 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 }
 
 // StoreWithMeta stores file contents via Store and records persistent FileMeta metadata.
-func (s *FileServer) StoreWithMeta(key string, filename string, owner string, contentType string, r io.Reader) (*FileMeta, error) {
-	// Read full payload into memory so it can be written locally, replicated over P2P, and backed up to GDrive
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read upload payload: %w", err)
-	}
-
-	if err := s.Store(key, bytes.NewReader(data)); err != nil {
+// It streams data without keeping whole-file buffers in memory.
+func (s *FileServer) StoreWithMeta(key string, filename string, owner string, contentType string, checksum string, size int64, r io.Reader) (*FileMeta, error) {
+	if err := s.Store(key, r); err != nil {
 		return nil, err
 	}
 
 	peers := s.getPeers()
-	hash := sha256.Sum256(data)
-	checksumStr := hex.EncodeToString(hash[:])
-
 	meta := &FileMeta{
 		Key:         key,
 		Filename:    filename,
-		Size:        int64(len(data)),
+		Size:        size,
 		ContentType: contentType,
 		Owner:       owner,
-		Checksum:    checksumStr,
+		Checksum:    checksum,
 		UploadTime:  time.Now(),
 		NodeID:      s.ListenAddr,
 		Replicas:    len(peers) + 1,
+		RefCount:    1,
 	}
 
 	if s.Metadata != nil {
@@ -326,7 +329,7 @@ func (s *FileServer) StoreWithMeta(key string, filename string, owner string, co
 
 	if s.GDrive != nil && s.GDrive.Enabled {
 		if _, encReader, err := s.Storage.Read(s.ID, key); err == nil {
-			func() {
+			go func() {
 				if rc, ok := encReader.(io.ReadCloser); ok {
 					defer rc.Close()
 				}
@@ -452,13 +455,18 @@ func (s *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) e
 	return nil
 }
 
-// Delete purges a file by key locally and broadcasts MessageDeleteFile to all peer nodes.
+// Delete purges a file by key locally (if no remaining references) and broadcasts MessageDeleteFile to all peer nodes.
 func (s *FileServer) Delete(key string) error {
+	if s.Metadata != nil {
+		shouldPurge, _ := s.Metadata.DecrementOrDelete(key)
+		if !shouldPurge {
+			log.Printf("[%s] reference count decremented for key (%s); remaining references exist, keeping on disk\n", s.Transport.Addr(), key)
+			return nil
+		}
+	}
+
 	log.Printf("[%s] deleting file (%s) locally and broadcasting to network...\n", s.Transport.Addr(), key)
 	_ = s.Storage.Delete(s.ID, key)
-	if s.Metadata != nil {
-		_ = s.Metadata.Delete(key)
-	}
 	if s.GDrive != nil && s.GDrive.Enabled {
 		go func(k string) {
 			_ = s.GDrive.DeleteFile(k)

@@ -1,13 +1,15 @@
 package api
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+
+	"github.com/yigithankarabulut/distributed-file-storage/fileserver"
 )
 
 type UploadResponse struct {
@@ -17,6 +19,8 @@ type UploadResponse struct {
 	Filename string `json:"filename,omitempty"`
 }
 
+// UploadHandler streams multipart uploads into a temporary file while hashing (no whole-file RAM buffers),
+// derives a namespaced CAS storage key, and deduplicates identical content per owner.
 func (a *App) UploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -24,36 +28,6 @@ func (a *App) UploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-
-	// Parse up to 1GB multipart form
-	if err := r.ParseMultipartForm(1024 * 1024 * 1024); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(UploadResponse{
-			Success: false,
-			Message: "Failed to parse multipart form payload",
-		})
-		return
-	}
-
-	file, header, err := r.FormFile("file")
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(UploadResponse{
-			Success: false,
-			Message: "No file field found in form request",
-		})
-		return
-	}
-	defer file.Close()
-
-	if len(a.Servers) == 0 {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(UploadResponse{
-			Success: false,
-			Message: "No storage servers running in cluster",
-		})
-		return
-	}
 
 	user, ok := a.CurrentUser(r)
 	if !ok || user == nil || user.Username == "" {
@@ -66,45 +40,160 @@ func (a *App) UploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	owner := user.Username
 
-	// Compute Content-Addressable Storage (CAS) key from filename, owner, and payload
-	var reader io.Reader = file
-	hasher := sha256.New()
-	hasher.Write([]byte(header.Filename + ":" + owner + ":"))
-
-	if seeker, ok := file.(io.Seeker); ok {
-		if _, err := io.Copy(hasher, file); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(UploadResponse{
-				Success: false,
-				Message: "Failed to read upload payload: " + err.Error(),
-			})
-			return
-		}
-		if _, err := seeker.Seek(0, io.SeekStart); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(UploadResponse{
-				Success: false,
-				Message: "Failed to rewind payload stream: " + err.Error(),
-			})
-			return
-		}
-	} else {
-		data, err := io.ReadAll(file)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(UploadResponse{
-				Success: false,
-				Message: "Failed to read upload payload: " + err.Error(),
-			})
-			return
-		}
-		hasher.Write(data)
-		reader = bytes.NewReader(data)
+	if len(a.Servers) == 0 {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(UploadResponse{
+			Success: false,
+			Message: "No storage servers running in cluster",
+		})
+		return
 	}
 
-	key := hex.EncodeToString(hasher.Sum(nil)[:16])
+	// 1. Enforce configurable maximum upload size with http.MaxBytesReader
+	maxUploadSize := int64(1024 * 1024 * 1024) // 1GB default
+	if a.Cfg != nil && a.Cfg.MaxUploadSize > 0 {
+		maxUploadSize = a.Cfg.MaxUploadSize
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
 
-	meta, err := a.Servers[0].StoreWithMeta(key, header.Filename, owner, header.Header.Get("Content-Type"), reader)
+	// 2. Stream multipart form using MultipartReader (no ParseMultipartForm whole-file buffering)
+	mr, err := r.MultipartReader()
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(UploadResponse{
+			Success: false,
+			Message: "Failed to read multipart stream: " + err.Error(),
+		})
+		return
+	}
+
+	var (
+		tmpFile     *os.File
+		filename    string
+		contentType string
+		fileSize    int64
+		contentSHA  string
+	)
+
+	for {
+		part, err := mr.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(UploadResponse{
+				Success: false,
+				Message: "Failed to read multipart part: " + err.Error(),
+			})
+			return
+		}
+
+		if part.FormName() == "file" {
+			filename = part.FileName()
+			contentType = part.Header.Get("Content-Type")
+			if contentType == "" {
+				contentType = "application/octet-stream"
+			}
+
+			// Stream directly to temp file while computing full SHA-256
+			tmpFile, err = os.CreateTemp("", "nazeerdfs_upload_*")
+			if err != nil {
+				part.Close()
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(UploadResponse{
+					Success: false,
+					Message: "Failed to create temp upload file: " + err.Error(),
+				})
+				return
+			}
+
+			hasher := sha256.New()
+			written, copyErr := io.Copy(io.MultiWriter(tmpFile, hasher), part)
+			part.Close()
+			if copyErr != nil {
+				_ = tmpFile.Close()
+				_ = os.Remove(tmpFile.Name())
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(UploadResponse{
+					Success: false,
+					Message: "Upload stream read error: " + copyErr.Error(),
+				})
+				return
+			}
+
+			fileSize = written
+			contentSHA = hex.EncodeToString(hasher.Sum(nil))
+			break
+		}
+		part.Close()
+	}
+
+	if tmpFile == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(UploadResponse{
+			Success: false,
+			Message: "No file field found in multipart payload",
+		})
+		return
+	}
+	defer func() {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpFile.Name())
+	}()
+
+	// 3. Make key genuinely content-derived: full SHA-256 of plaintext content, namespaced per owner.
+	keyHasher := sha256.New()
+	keyHasher.Write([]byte(owner + ":" + contentSHA))
+	casKey := hex.EncodeToString(keyHasher.Sum(nil))
+
+	// 4. Deduplication: check if identical content already exists for this owner
+	var existingMeta *fileserver.FileMeta
+	if a.DB != nil && a.DB.Active {
+		if m, err := a.DB.GetFileRecordByKey(casKey); err == nil && m != nil {
+			existingMeta = m
+		}
+	}
+	if existingMeta == nil && len(a.Servers) > 0 && a.Servers[0].Metadata != nil {
+		if m, ok := a.Servers[0].Metadata.Get(casKey); ok {
+			existingMeta = m
+		}
+	}
+
+	if existingMeta != nil {
+		// Content deduplicated! Increment reference count in MySQL and metadata store.
+		existingMeta.Filename = filename // update metadata record with requested filename
+		if a.DB != nil && a.DB.Active {
+			_ = a.DB.SaveFileRecord(existingMeta)
+			a.DB.InsertAuditLog("INFO", a.Servers[0].ListenAddr, fmt.Sprintf("Deduplicated file '%s' (reused CAS key %s)", filename, casKey))
+		}
+		if a.Servers[0].Metadata != nil {
+			_ = a.Servers[0].Metadata.Put(existingMeta)
+		}
+
+		LogEvent("INFO", fmt.Sprintf("File '%s' deduplicated via CAS key %s (reference count incremented)", filename, casKey))
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(UploadResponse{
+			Success:  true,
+			Message:  "File content identical to existing upload; deduplicated with reference count increment.",
+			FileID:   casKey,
+			Filename: filename,
+		})
+		return
+	}
+
+	// 5. Rewind temp file and stream into encrypted storage
+	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(UploadResponse{
+			Success: false,
+			Message: "Failed to rewind temp file stream: " + err.Error(),
+		})
+		return
+	}
+
+	meta, err := a.Servers[0].StoreWithMeta(casKey, filename, owner, contentType, contentSHA, fileSize, tmpFile)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(UploadResponse{
@@ -116,7 +205,7 @@ func (a *App) UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogEvent("INFO", fmt.Sprintf("File '%s' stored in CAS with key %s and replicated across cluster", meta.Filename, meta.Key))
 
-	if a.DB != nil {
+	if a.DB != nil && a.DB.Active {
 		_ = a.DB.SaveFileRecord(meta)
 		a.DB.InsertAuditLog("INFO", a.Servers[0].ListenAddr, fmt.Sprintf("Uploaded file '%s' (%d bytes, key: %s)", meta.Filename, meta.Size, meta.Key))
 	}
@@ -129,4 +218,3 @@ func (a *App) UploadHandler(w http.ResponseWriter, r *http.Request) {
 		Filename: meta.Filename,
 	})
 }
-

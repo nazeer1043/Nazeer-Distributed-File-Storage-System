@@ -61,12 +61,10 @@ func (db *DBWrapper) SaveFileRecord(meta *fileserver.FileMeta) error {
 	}
 
 	query := `
-		INSERT INTO files (id, file_key, filename, file_size, content_type, owner_name, checksum, encryption_algorithm, status, created_at)
-		VALUES (UUID(), ?, ?, ?, ?, ?, ?, 'AES-256-GCM', 'Healthy', NOW())
+		INSERT INTO files (id, file_key, filename, file_size, content_type, owner_name, checksum, encryption_algorithm, status, ref_count, created_at, updated_at)
+		VALUES (UUID(), ?, ?, ?, ?, ?, ?, 'AES-256-GCM', 'Healthy', 1, NOW(), NOW())
 		ON DUPLICATE KEY UPDATE
-			filename = VALUES(filename),
-			file_size = VALUES(file_size),
-			content_type = VALUES(content_type),
+			ref_count = ref_count + 1,
 			updated_at = NOW();
 	`
 
@@ -80,21 +78,35 @@ func (db *DBWrapper) SaveFileRecord(meta *fileserver.FileMeta) error {
 	return nil
 }
 
+// DecrementOrDeleteFileRecord decrements the file's reference count.
+// Returns shouldPurge = true when references reach 0 and the record is purged.
+func (db *DBWrapper) DecrementOrDeleteFileRecord(key string) (bool, error) {
+	if !db.Active || db.DB == nil {
+		return true, nil
+	}
+
+	var refCount int
+	err := db.QueryRow("SELECT ref_count FROM files WHERE file_key = ?", key).Scan(&refCount)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	if refCount > 1 {
+		_, err := db.Exec("UPDATE files SET ref_count = ref_count - 1, updated_at = NOW() WHERE file_key = ?", key)
+		return false, err
+	}
+
+	_, err = db.Exec("DELETE FROM files WHERE file_key = ?", key)
+	return true, err
+}
+
 // DeleteFileRecord removes a file record from the files table by key.
 func (db *DBWrapper) DeleteFileRecord(key string) error {
-	if !db.Active || db.DB == nil {
-		return nil
-	}
-
-	query := `DELETE FROM files WHERE file_key = ?`
-	_, err := db.Exec(query, key)
-	if err != nil {
-		log.Printf("[MySQL] Error deleting file record (%s): %v\n", key, err)
-		return err
-	}
-
-	log.Printf("[MySQL] Purged file (%s) from MySQL files table\n", key)
-	return nil
+	_, err := db.DecrementOrDeleteFileRecord(key)
+	return err
 }
 
 // InsertAuditLog records a cluster system log in the system_logs table.
@@ -285,7 +297,7 @@ func (db *DBWrapper) GetFileRecords() ([]*fileserver.FileMeta, error) {
 		return nil, nil
 	}
 
-	query := `SELECT file_key, filename, file_size, content_type, owner_name, checksum, created_at FROM files ORDER BY created_at DESC`
+	query := `SELECT file_key, filename, file_size, content_type, owner_name, checksum, ref_count, created_at FROM files ORDER BY created_at DESC`
 	rows, err := db.Query(query)
 	if err != nil {
 		log.Printf("[MySQL] Error querying files: %v\n", err)
@@ -296,7 +308,7 @@ func (db *DBWrapper) GetFileRecords() ([]*fileserver.FileMeta, error) {
 	var list []*fileserver.FileMeta
 	for rows.Next() {
 		var m fileserver.FileMeta
-		if err := rows.Scan(&m.Key, &m.Filename, &m.Size, &m.ContentType, &m.Owner, &m.Checksum, &m.UploadTime); err != nil {
+		if err := rows.Scan(&m.Key, &m.Filename, &m.Size, &m.ContentType, &m.Owner, &m.Checksum, &m.RefCount, &m.UploadTime); err != nil {
 			continue
 		}
 		m.Replicas = 3
@@ -311,9 +323,9 @@ func (db *DBWrapper) GetFileRecordByKey(key string) (*fileserver.FileMeta, error
 		return nil, nil
 	}
 
-	query := `SELECT file_key, filename, file_size, content_type, owner_name, checksum, created_at FROM files WHERE file_key = ? LIMIT 1`
+	query := `SELECT file_key, filename, file_size, content_type, owner_name, checksum, ref_count, created_at FROM files WHERE file_key = ? LIMIT 1`
 	var m fileserver.FileMeta
-	err := db.QueryRow(query, key).Scan(&m.Key, &m.Filename, &m.Size, &m.ContentType, &m.Owner, &m.Checksum, &m.UploadTime)
+	err := db.QueryRow(query, key).Scan(&m.Key, &m.Filename, &m.Size, &m.ContentType, &m.Owner, &m.Checksum, &m.RefCount, &m.UploadTime)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil

@@ -36,6 +36,9 @@ type Config struct {
 	CredentialsPath string
 	TokenPath       string
 
+	// Max Upload Size (bytes)
+	MaxUploadSize int64
+
 	// TLS / Security
 	TLSEnabled bool
 }
@@ -127,6 +130,13 @@ func LoadConfig() (*Config, error) {
 
 	tlsEnabled, _ := strconv.ParseBool(getEnv("TLS_ENABLED", "false"))
 
+	maxUploadSize := int64(1024 * 1024 * 1024) // 1GB default
+	if maxStr := getEnv("MAX_UPLOAD_SIZE_BYTES", ""); maxStr != "" {
+		if parsed, err := strconv.ParseInt(maxStr, 10, 64); err == nil && parsed > 0 {
+			maxUploadSize = parsed
+		}
+	}
+
 	cfg := &Config{
 		Env:                    env,
 		HTTPPort:               httpPort,
@@ -148,6 +158,7 @@ func LoadConfig() (*Config, error) {
 		TokenJSON:              tokenJSON,
 		CredentialsPath:        credsPath,
 		TokenPath:              tokenPath,
+		MaxUploadSize:          maxUploadSize,
 		TLSEnabled:             tlsEnabled,
 	}
 

@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yigithankarabulut/distributed-file-storage/config"
 	"github.com/yigithankarabulut/distributed-file-storage/crypto"
 	"github.com/yigithankarabulut/distributed-file-storage/db"
 	"github.com/yigithankarabulut/distributed-file-storage/fileserver"
@@ -236,4 +237,144 @@ func TestApp_CrossUserFileAuthorization(t *testing.T) {
 	aliceDelRec := httptest.NewRecorder()
 	app.DeleteHandler(aliceDelRec, aliceDelReq)
 	assert.Equal(t, http.StatusOK, aliceDelRec.Code)
+}
+
+func TestApp_ContentAddressedStorage_DeduplicationAndRefCounting(t *testing.T) {
+	srv, cleanup := createTestServer(t)
+	defer cleanup()
+
+	app := &App{
+		Servers:   []*fileserver.FileServer{srv},
+		DB:        &db.DBWrapper{DB: nil, Active: false},
+		StartTime: time.Now(),
+	}
+
+	aliceSession, err := globalSessions.create(User{Username: "alice_cas", Role: "user"})
+	require.NoError(t, err)
+
+	bobSession, err := globalSessions.create(User{Username: "bob_cas", Role: "user"})
+	require.NoError(t, err)
+
+	identicalPayload := []byte("Identical content payload for Content Addressable Storage verification 2026")
+
+	// Helper to perform multipart upload
+	uploadFile := func(filename string, session string) UploadResponse {
+		body := new(bytes.Buffer)
+		writer := multipart.NewWriter(body)
+		part, err := writer.CreateFormFile("file", filename)
+		require.NoError(t, err)
+		_, err = part.Write(identicalPayload)
+		require.NoError(t, err)
+		require.NoError(t, writer.Close())
+
+		req := httptest.NewRequest(http.MethodPost, "/api/upload", body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
+		rec := httptest.NewRecorder()
+
+		app.UploadHandler(rec, req)
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp UploadResponse
+		err = json.NewDecoder(rec.Body).Decode(&resp)
+		require.NoError(t, err)
+		return resp
+	}
+
+	// 1. Alice uploads doc_1.txt
+	aliceResp1 := uploadFile("doc_1.txt", aliceSession)
+	assert.True(t, aliceResp1.Success)
+	assert.Len(t, aliceResp1.FileID, 64, "Key must be full 64-char SHA-256 hash")
+
+	// 2. Bob uploads same content -> Key must be DIFFERENT (namespaced per owner)
+	bobResp := uploadFile("bob_doc.txt", bobSession)
+	assert.True(t, bobResp.Success)
+	assert.Len(t, bobResp.FileID, 64)
+	assert.NotEqual(t, aliceResp1.FileID, bobResp.FileID, "CAS key must be namespaced per owner")
+
+	// 3. Alice uploads doc_2.txt with identical content -> Deduplicated!
+	aliceResp2 := uploadFile("doc_2.txt", aliceSession)
+	assert.True(t, aliceResp2.Success)
+	assert.Equal(t, aliceResp1.FileID, aliceResp2.FileID, "Identical content for same owner must produce identical CAS key")
+
+	// Verify reference count in metadata is 2
+	meta, exists := srv.Metadata.Get(aliceResp1.FileID)
+	require.True(t, exists)
+	assert.Equal(t, 2, meta.RefCount, "Deduplication must increment RefCount to 2")
+
+	// 4. First delete: reference count drops to 1, file remains on disk
+	delReq1 := httptest.NewRequest(http.MethodDelete, "/api/delete?key="+aliceResp1.FileID, nil)
+	delReq1.AddCookie(&http.Cookie{Name: sessionCookieName, Value: aliceSession})
+	delRec1 := httptest.NewRecorder()
+	app.DeleteHandler(delRec1, delReq1)
+	assert.Equal(t, http.StatusOK, delRec1.Code)
+
+	metaAfterFirstDel, exists := srv.Metadata.Get(aliceResp1.FileID)
+	require.True(t, exists, "File metadata must still exist after first delete")
+	assert.Equal(t, 1, metaAfterFirstDel.RefCount, "RefCount must be decremented to 1")
+
+	// Verify file is still downloadable
+	dlReq := httptest.NewRequest(http.MethodGet, "/api/download?key="+aliceResp1.FileID, nil)
+	dlReq.AddCookie(&http.Cookie{Name: sessionCookieName, Value: aliceSession})
+	dlRec := httptest.NewRecorder()
+	app.DownloadHandler(dlRec, dlReq)
+	assert.Equal(t, http.StatusOK, dlRec.Code)
+	assert.Equal(t, identicalPayload, dlRec.Body.Bytes())
+
+	// 5. Second delete: reference count drops to 0, file is purged
+	delReq2 := httptest.NewRequest(http.MethodDelete, "/api/delete?key="+aliceResp1.FileID, nil)
+	delReq2.AddCookie(&http.Cookie{Name: sessionCookieName, Value: aliceSession})
+	delRec2 := httptest.NewRecorder()
+	app.DeleteHandler(delRec2, delReq2)
+	assert.Equal(t, http.StatusOK, delRec2.Code)
+
+	_, exists = srv.Metadata.Get(aliceResp1.FileID)
+	assert.False(t, exists, "File metadata must be gone after final delete")
+
+	// Subsequent download must return 404
+	dlReq2 := httptest.NewRequest(http.MethodGet, "/api/download?key="+aliceResp1.FileID, nil)
+	dlReq2.AddCookie(&http.Cookie{Name: sessionCookieName, Value: aliceSession})
+	dlRec2 := httptest.NewRecorder()
+	app.DownloadHandler(dlRec2, dlReq2)
+	assert.Equal(t, http.StatusNotFound, dlRec2.Code)
+}
+
+func TestApp_MaxUploadSizeEnforcement(t *testing.T) {
+	srv, cleanup := createTestServer(t)
+	defer cleanup()
+
+	// Configure small max upload size: 20 bytes
+	smallCfg := &config.Config{
+		MaxUploadSize: 20,
+	}
+
+	app := &App{
+		Servers:   []*fileserver.FileServer{srv},
+		DB:        &db.DBWrapper{DB: nil, Active: false},
+		Cfg:       smallCfg,
+		StartTime: time.Now(),
+	}
+
+	session, err := globalSessions.create(User{Username: "test_size_user", Role: "user"})
+	require.NoError(t, err)
+
+	// Create payload larger than 20 bytes (e.g. 100 bytes)
+	largePayload := bytes.Repeat([]byte("A"), 100)
+
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", "large.txt")
+	require.NoError(t, err)
+	_, err = part.Write(largePayload)
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/api/upload", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
+	rec := httptest.NewRecorder()
+
+	app.UploadHandler(rec, req)
+	// Must fail with 400 Bad Request or error due to max bytes exceeded
+	assert.NotEqual(t, http.StatusOK, rec.Code)
 }
