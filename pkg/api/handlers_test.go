@@ -378,3 +378,42 @@ func TestApp_MaxUploadSizeEnforcement(t *testing.T) {
 	// Must fail with 400 Bad Request or error due to max bytes exceeded
 	assert.NotEqual(t, http.StatusOK, rec.Code)
 }
+
+func TestApp_NodeRouting_ConsistentHashingAndRoundRobin(t *testing.T) {
+	srv1, cleanup1 := createTestServer(t)
+	defer cleanup1()
+	srv2, cleanup2 := createTestServer(t)
+	defer cleanup2()
+
+	app := &App{
+		Servers:   []*fileserver.FileServer{srv1, srv2},
+		DB:        &db.DBWrapper{DB: nil, Active: false},
+		StartTime: time.Now(),
+	}
+
+	// 1. Healthy servers test
+	healthy := app.GetHealthyServers()
+	assert.Len(t, healthy, 2)
+
+	// 2. Consistent hashing returns deterministic node for the same key
+	key := "test-consistent-cas-key-xyz"
+	chosen1, err1 := app.SelectServer(key)
+	require.NoError(t, err1)
+	chosen2, err2 := app.SelectServer(key)
+	require.NoError(t, err2)
+	assert.Equal(t, chosen1.ListenAddr, chosen2.ListenAddr, "Same key must consistently map to same primary node")
+
+	// 3. Round-robin alternates between healthy nodes
+	rr1, errRR1 := app.RoundRobinServer()
+	require.NoError(t, errRR1)
+	rr2, errRR2 := app.RoundRobinServer()
+	require.NoError(t, errRR2)
+	assert.NotNil(t, rr1)
+	assert.NotNil(t, rr2)
+
+	// 4. Marking a server as stopped excludes it from healthy pool
+	srv1.Stop()
+	healthyAfterStop := app.GetHealthyServers()
+	assert.Len(t, healthyAfterStop, 1)
+	assert.Equal(t, srv2.ListenAddr, healthyAfterStop[0].ListenAddr)
+}

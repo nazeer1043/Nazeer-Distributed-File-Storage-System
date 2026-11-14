@@ -21,7 +21,8 @@ type DashboardResponse struct {
 func (a *App) DashboardHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	activeNodes := len(a.Servers)
+	healthyServers := a.GetHealthyServers()
+	activeNodes := len(healthyServers)
 	var totalBytes int64 = 0
 
 	for _, srv := range a.Servers {
@@ -43,8 +44,11 @@ func (a *App) DashboardHandler(w http.ResponseWriter, r *http.Request) {
 	formattedUsed := formatBytes(totalBytes)
 
 	gdriveConnected := false
-	if len(a.Servers) > 0 && a.Servers[0].GDrive != nil && a.Servers[0].GDrive.Enabled {
-		gdriveConnected = true
+	for _, srv := range a.Servers {
+		if srv != nil && srv.GDrive != nil && srv.GDrive.Enabled {
+			gdriveConnected = true
+			break
+		}
 	}
 
 	response := DashboardResponse{

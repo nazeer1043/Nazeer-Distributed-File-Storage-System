@@ -60,8 +60,8 @@ func (a *App) FilesHandler(w http.ResponseWriter, r *http.Request) {
 	idCounter := 1
 
 	nodeAddr := ":3000"
-	if len(a.Servers) > 0 {
-		nodeAddr = a.Servers[0].ListenAddr
+	if healthy := a.GetHealthyServers(); len(healthy) > 0 {
+		nodeAddr = healthy[0].ListenAddr
 	}
 
 	// 1. MySQL is the primary source of truth for metadata

@@ -45,10 +45,11 @@ type FileServer struct {
 	peerLock sync.RWMutex
 	peers    map[string]p2p.Peer
 
-	Storage  *store.Store
-	Metadata *MetadataStore
-	GDrive   *store.GDriveStore
-	doneChan chan struct{}
+	Storage     *store.Store
+	Metadata    *MetadataStore
+	GDrive      *store.GDriveStore
+	GDriveQueue *GDriveQueue
+	doneChan    chan struct{}
 
 	ackMu  sync.RWMutex
 	ackChs map[uint64]chan MessageAck
@@ -93,6 +94,7 @@ func NewFileServer(opts ServerOpts) *FileServer {
 		ackChs:     make(map[uint64]chan MessageAck),
 		dataChs:    make(map[uint64]chan []byte),
 	}
+	fs.GDriveQueue = NewGDriveQueue(fs, gdriveStore, 100)
 
 	return fs
 }
@@ -118,6 +120,19 @@ func (s *FileServer) Stop() {
 	case <-s.doneChan:
 	default:
 		close(s.doneChan)
+	}
+	if s.GDriveQueue != nil {
+		s.GDriveQueue.Stop()
+	}
+}
+
+// IsHealthy returns true if the server is active, listening, and has not been stopped.
+func (s *FileServer) IsHealthy() bool {
+	select {
+	case <-s.doneChan:
+		return false
+	default:
+		return s.Transport != nil
 	}
 }
 
@@ -447,19 +462,8 @@ func (s *FileServer) StoreWithMeta(key string, filename string, owner string, co
 		}
 	}
 
-	if s.GDrive != nil && s.GDrive.Enabled {
-		if _, encReader, err := s.Storage.Read(s.ID, key); err == nil {
-			go func() {
-				if rc, ok := encReader.(io.ReadCloser); ok {
-					defer rc.Close()
-				}
-				if driveFileID, gdriveErr := s.GDrive.UploadFile(key, filename, encReader); gdriveErr == nil {
-					log.Printf("[%s] Google Drive Cloud Backup upload successful for (%s)! Drive File ID: %s\n", s.ListenAddr, filename, driveFileID)
-				} else {
-					log.Printf("[%s] GDrive upload error for (%s): %v\n", s.ListenAddr, filename, gdriveErr)
-				}
-			}()
-		}
+	if s.GDriveQueue != nil {
+		s.GDriveQueue.Enqueue(key, filename)
 	}
 
 	return meta, nil

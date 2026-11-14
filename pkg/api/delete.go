@@ -103,8 +103,8 @@ func (a *App) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	if a.DB != nil && a.DB.Active {
 		listenAddr := ":3000"
-		if len(a.Servers) > 0 {
-			listenAddr = a.Servers[0].ListenAddr
+		if healthy := a.GetHealthyServers(); len(healthy) > 0 {
+			listenAddr = healthy[0].ListenAddr
 		}
 		a.DB.InsertAuditLog("WARN", listenAddr, fmt.Sprintf("File '%s' (key: %s) deleted/dereferenced by %s", targetFilename, key, user.Username))
 	}

@@ -147,6 +147,16 @@ func (a *App) UploadHandler(w http.ResponseWriter, r *http.Request) {
 	keyHasher.Write([]byte(owner + ":" + contentSHA))
 	casKey := hex.EncodeToString(keyHasher.Sum(nil))
 
+	targetServer, err := a.SelectServer(casKey)
+	if err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(UploadResponse{
+			Success: false,
+			Message: "No healthy storage nodes available in cluster: " + err.Error(),
+		})
+		return
+	}
+
 	// 4. Deduplication: check if identical content already exists for this owner
 	var existingMeta *fileserver.FileMeta
 	if a.DB != nil && a.DB.Active {
@@ -154,8 +164,8 @@ func (a *App) UploadHandler(w http.ResponseWriter, r *http.Request) {
 			existingMeta = m
 		}
 	}
-	if existingMeta == nil && len(a.Servers) > 0 && a.Servers[0].Metadata != nil {
-		if m, ok := a.Servers[0].Metadata.Get(casKey); ok {
+	if existingMeta == nil && targetServer.Metadata != nil {
+		if m, ok := targetServer.Metadata.Get(casKey); ok {
 			existingMeta = m
 		}
 	}
@@ -165,10 +175,10 @@ func (a *App) UploadHandler(w http.ResponseWriter, r *http.Request) {
 		existingMeta.Filename = filename // update metadata record with requested filename
 		if a.DB != nil && a.DB.Active {
 			_ = a.DB.SaveFileRecord(existingMeta)
-			a.DB.InsertAuditLog("INFO", a.Servers[0].ListenAddr, fmt.Sprintf("Deduplicated file '%s' (reused CAS key %s)", filename, casKey))
+			a.DB.InsertAuditLog("INFO", targetServer.ListenAddr, fmt.Sprintf("Deduplicated file '%s' (reused CAS key %s)", filename, casKey))
 		}
-		if a.Servers[0].Metadata != nil {
-			_ = a.Servers[0].Metadata.Put(existingMeta)
+		if targetServer.Metadata != nil {
+			_ = targetServer.Metadata.Put(existingMeta)
 		}
 
 		LogEvent("INFO", fmt.Sprintf("File '%s' deduplicated via CAS key %s (reference count incremented)", filename, casKey))
@@ -193,7 +203,7 @@ func (a *App) UploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	meta, err := a.Servers[0].StoreWithMeta(casKey, filename, owner, contentType, contentSHA, fileSize, tmpFile)
+	meta, err := targetServer.StoreWithMeta(casKey, filename, owner, contentType, contentSHA, fileSize, tmpFile)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(UploadResponse{
@@ -207,7 +217,7 @@ func (a *App) UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	if a.DB != nil && a.DB.Active {
 		_ = a.DB.SaveFileRecord(meta)
-		a.DB.InsertAuditLog("INFO", a.Servers[0].ListenAddr, fmt.Sprintf("Uploaded file '%s' (%d bytes, key: %s)", meta.Filename, meta.Size, meta.Key))
+		a.DB.InsertAuditLog("INFO", targetServer.ListenAddr, fmt.Sprintf("Uploaded file '%s' (%d bytes, key: %s)", meta.Filename, meta.Size, meta.Key))
 	}
 
 	w.WriteHeader(http.StatusOK)

@@ -14,6 +14,7 @@ type App struct {
 	DB        *db.DBWrapper
 	Cfg       *config.Config
 	StartTime time.Time
+	rrIndex   uint64
 }
 
 // New creates a new App with the given file servers and database connection.

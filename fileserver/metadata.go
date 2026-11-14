@@ -11,16 +11,19 @@ import (
 
 // FileMeta holds metadata information for stored files.
 type FileMeta struct {
-	Key         string    `json:"key"`
-	Filename    string    `json:"filename"`
-	Size        int64     `json:"size"`
-	ContentType string    `json:"contentType"`
-	Owner       string    `json:"owner"`
-	Checksum    string    `json:"checksum"`
-	UploadTime  time.Time `json:"uploadTime"`
-	NodeID      string    `json:"nodeId"`
-	Replicas    int       `json:"replicas"`
-	RefCount    int       `json:"refCount"`
+	Key          string    `json:"key"`
+	Filename     string    `json:"filename"`
+	Size         int64     `json:"size"`
+	ContentType  string    `json:"contentType"`
+	Owner        string    `json:"owner"`
+	Checksum     string    `json:"checksum"`
+	UploadTime   time.Time `json:"uploadTime"`
+	NodeID       string    `json:"nodeId"`
+	Replicas     int       `json:"replicas"`
+	RefCount     int       `json:"refCount"`
+	GDriveStatus string    `json:"gdriveStatus,omitempty"`
+	GDriveFileID string    `json:"gdriveFileId,omitempty"`
+	GDriveError  string    `json:"gdriveError,omitempty"`
 }
 
 // MetadataStore handles thread-safe persistent metadata storage per server node.
@@ -165,4 +168,19 @@ func (ms *MetadataStore) List() []*FileMeta {
 		list = append(list, v)
 	}
 	return list
+}
+
+// UpdateGDriveStatus updates the Google Drive cloud backup status and identifiers for a file.
+func (ms *MetadataStore) UpdateGDriveStatus(key string, status string, driveFileID string, driveError string) error {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
+	entry, ok := ms.entries[key]
+	if !ok {
+		return fmt.Errorf("metadata entry for key (%s) not found", key)
+	}
+	entry.GDriveStatus = status
+	entry.GDriveFileID = driveFileID
+	entry.GDriveError = driveError
+	return ms.saveLocked()
 }

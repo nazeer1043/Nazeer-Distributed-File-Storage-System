@@ -41,8 +41,9 @@ func (a *App) DownloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(a.Servers) == 0 {
-		http.Error(w, "No storage servers available", http.StatusInternalServerError)
+	healthy := a.GetHealthyServers()
+	if len(healthy) == 0 {
+		http.Error(w, "No healthy storage servers available", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -81,9 +82,31 @@ func (a *App) DownloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reader, err := a.Servers[0].Get(key)
+	// Try primary server selected by consistent hash first, then fall back to other healthy nodes
+	primary, selectErr := a.SelectServer(key)
+	var (
+		reader io.Reader
+		err    error
+	)
+	if selectErr == nil {
+		reader, err = primary.Get(key)
+	} else {
+		err = selectErr
+	}
+
 	if err != nil {
-		http.Error(w, fmt.Sprintf("File not found or storage error: %v", err), http.StatusNotFound)
+		for _, srv := range healthy {
+			if srv == primary {
+				continue
+			}
+			reader, err = srv.Get(key)
+			if err == nil {
+				break
+			}
+		}
+	}
+	if err != nil {
+		http.Error(w, fmt.Sprintf("File not found in cluster: %v", err), http.StatusNotFound)
 		return
 	}
 

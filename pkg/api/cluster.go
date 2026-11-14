@@ -29,7 +29,9 @@ func (a *App) ClusterHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	activeCount := len(a.Servers)
+	healthyServers := a.GetHealthyServers()
+	activeCount := len(healthyServers)
+	totalCount := len(a.Servers)
 	var totalClusterBytes int64 = 0
 
 	for _, srv := range a.Servers {
@@ -46,12 +48,20 @@ func (a *App) ClusterHandler(w http.ResponseWriter, r *http.Request) {
 	freeGB := totalCapacityGB - usedGB
 
 	gdriveActive := false
-	if len(a.Servers) > 0 && a.Servers[0].GDrive != nil && a.Servers[0].GDrive.Enabled {
-		gdriveActive = true
+	for _, srv := range a.Servers {
+		if srv != nil && srv.GDrive != nil && srv.GDrive.Enabled {
+			gdriveActive = true
+			break
+		}
 	}
 
 	uptimeDuration := time.Since(a.StartTime)
 	uptimeStr := fmt.Sprintf("%d hours, %d mins", int(uptimeDuration.Hours()), int(uptimeDuration.Minutes())%60)
+
+	healthScore := 0.0
+	if totalCount > 0 {
+		healthScore = (float64(activeCount) / float64(totalCount)) * 100.0
+	}
 
 	json.NewEncoder(w).Encode(ClusterStatusResponse{
 		ClusterID:         "nazeerdfs-cluster-01",
@@ -60,9 +70,9 @@ func (a *App) ClusterHandler(w http.ResponseWriter, r *http.Request) {
 		UsedStorage:       usedGB,
 		FreeStorage:       freeGB,
 		ActiveNodes:       activeCount,
-		TotalNodes:        activeCount,
-		ReplicationFactor: activeCount,
-		HealthScore:       100.0,
+		TotalNodes:        totalCount,
+		ReplicationFactor: 2,
+		HealthScore:       healthScore,
 		Uptime:            uptimeStr,
 		GDriveEnabled:     gdriveActive,
 	})

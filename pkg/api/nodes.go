@@ -66,11 +66,16 @@ func (a *App) NodesHandler(w http.ResponseWriter, r *http.Request) {
 		nodeID := fmt.Sprintf("node-%s", cleanAddr)
 		nodeName := fmt.Sprintf("Node %s (%s)", cleanAddr, role)
 
+		status := "Offline"
+		if srv.IsHealthy() {
+			status = "Online"
+		}
+
 		nodes = append(nodes, NodeInfo{
 			ID:       nodeID,
 			Name:     nodeName,
 			Addr:     srv.ListenAddr,
-			Status:   "Online",
+			Status:   status,
 			Storage:  fmt.Sprintf("%.2f GB / 4.0 TB", usedGB),
 			Used:     usedGB,
 			Total:    4.0,
@@ -81,7 +86,7 @@ func (a *App) NodesHandler(w http.ResponseWriter, r *http.Request) {
 		})
 
 		if a.DB != nil && a.DB.Active {
-			_ = a.DB.UpsertNodeRecord(nodeID, nodeName, srv.ListenAddr, role, "Online", 4398046511104, nodeBytes)
+			_ = a.DB.UpsertNodeRecord(nodeID, nodeName, srv.ListenAddr, role, status, 4398046511104, nodeBytes)
 		}
 	}
 

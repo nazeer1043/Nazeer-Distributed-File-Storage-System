@@ -2,15 +2,11 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -23,28 +19,11 @@ import (
 	"github.com/yigithankarabulut/distributed-file-storage/store"
 )
 
-// killProcessOnPort kills any process listening on the specified port (Windows local dev only)
-func killProcessOnPort(port string) {
-	if runtime.GOOS != "windows" {
-		return
-	}
-	// Check if port is already free
-	ln, err := net.Listen("tcp", ":"+port)
-	if err == nil {
-		_ = ln.Close()
-		return
-	}
-
-	cmd := exec.Command("cmd", "/c", fmt.Sprintf("for /f \"tokens=5\" %%a in ('netstat -ano ^| findstr /r \":%s \"') do taskkill /PID %%a /F", port))
-	_ = cmd.Run()
-	time.Sleep(100 * time.Millisecond)
-}
-
-func makeServer(listenAddr string, storageRoot string, encryptKey []byte, nodes ...string) *fileserver.FileServer {
+func makeServer(listenAddr string, storageRoot string, encryptKey []byte, clusterSecret string, nodes ...string) *fileserver.FileServer {
 	tcpTransport := p2p.NewTCPTransport(
 		p2p.WithListenAddr(listenAddr),
-		p2p.WithHandshakeFunc(p2p.NOPHandshakeFunc),
-		p2p.WithDecoder(&p2p.DefaultDecoder{}),
+		p2p.WithHandshakeFunc(p2p.HMACClusterHandshake(clusterSecret)),
+		p2p.WithDecoder(p2p.NewFramedDecoder()),
 	)
 
 	fileServerOpts := fileserver.ServerOpts{
@@ -54,10 +33,13 @@ func makeServer(listenAddr string, storageRoot string, encryptKey []byte, nodes 
 		PathTransformFunc: store.CASPathTransformFunc,
 		Transport:         tcpTransport,
 		BootstrapNodes:    nodes,
+		ClusterSecret:     clusterSecret,
+		ReplicationFactor: 2,
 	}
 
 	s := fileserver.NewFileServer(fileServerOpts)
 	tcpTransport.OnPeer = s.OnPeer
+	tcpTransport.OnPeerDisconnect = s.OnPeerDisconnect
 	return s
 }
 
@@ -73,16 +55,6 @@ func main() {
 
 	encryptKey := cfg.EncryptionKey
 
-	// Kill any existing processes on the ports we'll use (windows dev only)
-	var allPorts []string
-	for _, addr := range cfg.NodeListenAddrs {
-		allPorts = append(allPorts, strings.TrimPrefix(addr, ":"))
-	}
-	allPorts = append(allPorts, cfg.HTTPPort)
-	for _, port := range allPorts {
-		killProcessOnPort(port)
-	}
-
 	var servers []*fileserver.FileServer
 	for i, addr := range cfg.NodeListenAddrs {
 		storageRoot := cfg.StorageRoots[i]
@@ -90,17 +62,16 @@ func main() {
 		if i > 0 {
 			bootstraps = cfg.BootstrapNodes
 		}
-		s := makeServer(addr, storageRoot, encryptKey, bootstraps...)
+		s := makeServer(addr, storageRoot, encryptKey, cfg.ClusterSecret, bootstraps...)
 		servers = append(servers, s)
 	}
 
 	for i, srv := range servers {
 		go func(s *fileserver.FileServer, index int) {
 			if err := s.Start(); err != nil {
-				log.Printf("Failed to start server %d: %v", index+1, err)
+				log.Printf("Failed to start server %d (%s): %v", index+1, s.ListenAddr, err)
 			}
 		}(srv, i)
-		time.Sleep(200 * time.Millisecond)
 	}
 
 	// Connect to MySQL database
@@ -112,6 +83,8 @@ func main() {
 	fs := http.FileServer(http.Dir(webDir))
 
 	app := api.New(servers, database)
+	app.Cfg = cfg
+
 	mux := http.NewServeMux()
 	api.RegisterRoutes(mux, app)
 
@@ -137,9 +110,18 @@ func main() {
 	// Apply defense-in-depth security headers and anti-CSRF token verification
 	secureHandler := api.SecurityHeadersMiddleware(api.CSRFMiddleware(mux))
 
+	httpPort := cfg.HTTPPort
+	if p := os.Getenv("PORT"); p != "" {
+		httpPort = p
+	}
+
 	httpServer := &http.Server{
-		Addr:    ":" + cfg.HTTPPort,
-		Handler: secureHandler,
+		Addr:              ":" + httpPort,
+		Handler:           secureHandler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	// Graceful shutdown listener
@@ -147,7 +129,7 @@ func main() {
 	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("Frontend & REST API running at http://localhost:%s\n", cfg.HTTPPort)
+		log.Printf("Frontend & REST API running at http://localhost:%s\n", httpPort)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("HTTP server error: %v", err)
 		}
@@ -169,4 +151,3 @@ func main() {
 
 	log.Println("NazeerDFS cluster shutdown complete.")
 }
-
