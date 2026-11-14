@@ -597,7 +597,7 @@
                                 </div>
                                 <div>
                                     <label class="block font-semibold text-app2 mb-1">New Password</label>
-                                    <input id="newPasswordInput" type="password" placeholder="Min 3 characters" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none focus:border-brand-500">
+                                    <input id="newPasswordInput" type="password" placeholder="Min 12 characters" class="w-full bg-surface2 border border-app rounded-xl p-2.5 outline-none focus:border-brand-500">
                                 </div>
                                 <div>
                                     <label class="block font-semibold text-app2 mb-1">Confirm New Password</label>
@@ -1285,8 +1285,8 @@
                     showToast('Please enter your current password.', 'warning');
                     return;
                 }
-                if (next.length < 3) {
-                    showToast('New password must be at least 3 characters.', 'warning');
+                if (next.length < 12) {
+                    showToast('New password must be at least 12 characters.', 'warning');
                     return;
                 }
                 if (next !== confirm) {

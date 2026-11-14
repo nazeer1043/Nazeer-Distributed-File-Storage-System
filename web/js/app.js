@@ -1,5 +1,32 @@
 // NazeerDFS Enterprise Client App Helpers
 
+// Read anti-CSRF token from cookie
+function getCSRFToken() {
+    const match = document.cookie.match(new RegExp('(^| )nazeerdfs_csrf=([^;]+)'));
+    return match ? decodeURIComponent(match[2]) : '';
+}
+
+// Automatically intercept state-changing fetch requests and inject X-CSRF-Token
+const originalFetch = window.fetch;
+window.fetch = function(url, options) {
+    options = options || {};
+    const method = (options.method || 'GET').toUpperCase();
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+        options.headers = options.headers || {};
+        const csrfToken = getCSRFToken();
+        if (csrfToken) {
+            if (options.headers instanceof Headers) {
+                if (!options.headers.has('X-CSRF-Token')) options.headers.set('X-CSRF-Token', csrfToken);
+            } else if (Array.isArray(options.headers)) {
+                options.headers.push(['X-CSRF-Token', csrfToken]);
+            } else {
+                if (!options.headers['X-CSRF-Token']) options.headers['X-CSRF-Token'] = csrfToken;
+            }
+        }
+    }
+    return originalFetch(url, options);
+};
+
 // Session verification helper for protected pages
 async function checkSession(onSuccess) {
     try {

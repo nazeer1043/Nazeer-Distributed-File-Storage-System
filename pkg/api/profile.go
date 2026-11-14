@@ -1,9 +1,6 @@
 package api
 
 import (
-	"crypto/sha256"
-	"crypto/subtle"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -57,11 +54,12 @@ func (a *App) ProfileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !valid {
-		sessionUser = User{
-			Username: "admin",
-			Name:     "Mohammed Nazeer Ali",
-			Role:     "Cluster Admin",
-		}
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"message": "Session expired or invalid",
+		})
+		return
 	}
 
 	if r.Method == http.MethodGet {
@@ -92,24 +90,21 @@ func (a *App) ProfileHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Handle password change if requested
 		if req.NewPassword != "" {
-			if len(req.NewPassword) < 3 {
+			if len(req.NewPassword) < MinPasswordLength {
 				w.WriteHeader(http.StatusBadRequest)
 				json.NewEncoder(w).Encode(map[string]interface{}{
 					"success": false,
-					"message": "New password must be at least 3 characters",
+					"message": fmt.Sprintf("New password must be at least %d characters", MinPasswordLength),
 				})
 				return
 			}
 
 			// Validate current password
-			currHash := sha256.Sum256([]byte(req.CurrentPassword))
-			currHashHex := hex.EncodeToString(currHash[:])
-
 			var passVerified bool
 			if a != nil && a.DB != nil && a.DB.Active {
 				dbUser, err := a.DB.GetUserByUsername(sessionUser.Username)
 				if err == nil && dbUser != nil {
-					passVerified = (subtle.ConstantTimeCompare([]byte(currHashHex), []byte(dbUser.PasswordHash)) == 1)
+					passVerified = CheckPassword(dbUser.PasswordHash, req.CurrentPassword)
 				}
 			}
 
@@ -117,7 +112,7 @@ func (a *App) ProfileHandler(w http.ResponseWriter, r *http.Request) {
 				globalUsers.mu.RLock()
 				expectedHash := globalUsers.users[sessionUser.Username]
 				globalUsers.mu.RUnlock()
-				passVerified = (subtle.ConstantTimeCompare([]byte(currHashHex), []byte(expectedHash)) == 1)
+				passVerified = CheckPassword(expectedHash, req.CurrentPassword)
 			}
 
 			if !passVerified {
@@ -129,14 +124,21 @@ func (a *App) ProfileHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			newHash := sha256.Sum256([]byte(req.NewPassword))
-			newHashHex := hex.EncodeToString(newHash[:])
+			newHash, err := HashPassword(req.NewPassword)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"success": false,
+					"message": "Failed to hash new password",
+				})
+				return
+			}
 
 			// Update in DB & memory
-			if a != nil && a.DB != nil && a.DB.Active {
-				_ = a.DB.UpdateUserPassword(sessionUser.ID, newHashHex)
+			if a != nil && a.DB != nil && a.DB.Active && sessionUser.ID != "" {
+				_ = a.DB.UpdateUserPassword(sessionUser.ID, newHash)
 			}
-			globalUsers.updatePassword(sessionUser.Username, newHashHex)
+			globalUsers.updatePassword(sessionUser.Username, newHash)
 			LogEvent("INFO", fmt.Sprintf("Password changed successfully for user %s", sessionUser.Username))
 		}
 
@@ -217,9 +219,9 @@ func (a *App) UsersListHandler(w http.ResponseWriter, r *http.Request) {
 	if len(list) == 0 {
 		globalUsers.mu.RLock()
 		for uname := range globalUsers.users {
-			role := "User"
-			if uname == "admin" || uname == "admin@nazeerdfs.io" {
-				role = "Cluster Admin"
+			role := globalUsers.roles[uname]
+			if role == "" {
+				role = "user"
 			}
 			name := globalUsers.names[uname]
 			if name == "" {

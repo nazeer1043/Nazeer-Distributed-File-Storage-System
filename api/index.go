@@ -41,6 +41,7 @@ func init() {
 
 	servers := []*fileserver.FileServer{s1, s2, s3}
 	database := db.Connect(cfg)
+	api.BootstrapAdmin(database, cfg)
 
 	appInstance = api.New(servers, database)
 	muxInstance = http.NewServeMux()

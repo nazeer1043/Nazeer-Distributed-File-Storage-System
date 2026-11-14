@@ -105,6 +105,7 @@ func main() {
 
 	// Connect to MySQL database
 	database := db.Connect(cfg)
+	api.BootstrapAdmin(database, cfg)
 
 	// Serve the web frontend and API endpoints
 	webDir := filepath.Join(".", "web")
@@ -133,9 +134,12 @@ func main() {
 
 	mux.Handle("/", staticHandler)
 
+	// Apply defense-in-depth security headers and anti-CSRF token verification
+	secureHandler := api.SecurityHeadersMiddleware(api.CSRFMiddleware(mux))
+
 	httpServer := &http.Server{
 		Addr:    ":" + cfg.HTTPPort,
-		Handler: mux,
+		Handler: secureHandler,
 	}
 
 	// Graceful shutdown listener

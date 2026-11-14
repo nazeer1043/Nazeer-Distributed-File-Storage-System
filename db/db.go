@@ -1,7 +1,9 @@
 package db
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -159,18 +161,24 @@ func (db *DBWrapper) CreateUser(u *UserRecord) error {
 	return nil
 }
 
-// CreateSession records an active user session in the sessions table.
+// HashToken returns a SHA-256 hex digest of a raw token for secure database storage.
+func HashToken(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:])
+}
+
+// CreateSession records an active user session in the sessions table using a hashed token.
 func (db *DBWrapper) CreateSession(token, userID string, expiresAt time.Time) error {
 	if !db.Active || db.DB == nil {
 		return nil
 	}
-
+	hashed := HashToken(token)
 	query := `
 		INSERT INTO sessions (token, user_id, expires_at, created_at)
 		VALUES (?, ?, ?, NOW())
 		ON DUPLICATE KEY UPDATE expires_at = VALUES(expires_at)
 	`
-	_, err := db.Exec(query, token, userID, expiresAt)
+	_, err := db.Exec(query, hashed, userID, expiresAt)
 	if err != nil {
 		log.Printf("[MySQL] Error creating session: %v\n", err)
 		return err
@@ -178,12 +186,12 @@ func (db *DBWrapper) CreateSession(token, userID string, expiresAt time.Time) er
 	return nil
 }
 
-// GetSessionUser validates a session token and returns the corresponding UserRecord.
+// GetSessionUser validates a session token against its stored hash and returns the corresponding UserRecord.
 func (db *DBWrapper) GetSessionUser(token string) (*UserRecord, error) {
 	if !db.Active || db.DB == nil {
 		return nil, nil
 	}
-
+	hashed := HashToken(token)
 	query := `
 		SELECT u.id, u.username, u.password_hash, u.full_name, u.role, u.created_at
 		FROM sessions s
@@ -191,7 +199,7 @@ func (db *DBWrapper) GetSessionUser(token string) (*UserRecord, error) {
 		WHERE s.token = ? AND s.expires_at > NOW()
 		LIMIT 1
 	`
-	row := db.QueryRow(query, token)
+	row := db.QueryRow(query, hashed)
 
 	var u UserRecord
 	if err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.FullName, &u.Role, &u.CreatedAt); err != nil {
@@ -204,14 +212,14 @@ func (db *DBWrapper) GetSessionUser(token string) (*UserRecord, error) {
 	return &u, nil
 }
 
-// DeleteSession removes a session from the sessions table by token.
+// DeleteSession removes a session from the sessions table by its hashed token.
 func (db *DBWrapper) DeleteSession(token string) error {
 	if !db.Active || db.DB == nil {
 		return nil
 	}
-
+	hashed := HashToken(token)
 	query := `DELETE FROM sessions WHERE token = ?`
-	_, err := db.Exec(query, token)
+	_, err := db.Exec(query, hashed)
 	if err != nil {
 		log.Printf("[MySQL] Error deleting session: %v\n", err)
 		return err

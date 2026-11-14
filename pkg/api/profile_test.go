@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yigithankarabulut/distributed-file-storage/config"
 	"github.com/yigithankarabulut/distributed-file-storage/db"
 )
 
@@ -17,10 +18,17 @@ func TestApp_ProfileAndUsersWorkflow(t *testing.T) {
 		DB: &db.DBWrapper{DB: nil, Active: false},
 	}
 
+	// Bootstrap an admin user with >= 12 char password
+	cfg := &config.Config{
+		AdminBootstrapUser:     "admin_profile_test",
+		AdminBootstrapPassword: "adminSecurePassword2026!",
+	}
+	BootstrapAdmin(app.DB, cfg)
+
 	// 1. Log in as admin to get session cookie
 	loginBody, _ := json.Marshal(LoginRequest{
-		Username: "admin",
-		Password: "admin123",
+		Username: "admin_profile_test",
+		Password: "adminSecurePassword2026!",
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/login", bytes.NewReader(loginBody))
 	rec := httptest.NewRecorder()
@@ -47,7 +55,7 @@ func TestApp_ProfileAndUsersWorkflow(t *testing.T) {
 	err := json.NewDecoder(profRec.Body).Decode(&profResp)
 	require.NoError(t, err)
 	assert.True(t, profResp.Authenticated)
-	assert.Equal(t, "admin", profResp.User.Username)
+	assert.Equal(t, "admin_profile_test", profResp.User.Username)
 
 	// 3. POST /api/profile update Name & Org
 	updateBody, _ := json.Marshal(ProfileUpdateRequest{
@@ -62,8 +70,8 @@ func TestApp_ProfileAndUsersWorkflow(t *testing.T) {
 
 	// 4. Test Password update with wrong current password
 	badPassBody, _ := json.Marshal(ProfileUpdateRequest{
-		CurrentPassword: "wrongCurrentPassword",
-		NewPassword:     "newPass456",
+		CurrentPassword: "wrongCurrentPassword123",
+		NewPassword:     "newSecurePass2026!",
 	})
 	badReq := httptest.NewRequest(http.MethodPost, "/api/profile", bytes.NewReader(badPassBody))
 	badReq.AddCookie(sessionCookie)
@@ -73,8 +81,8 @@ func TestApp_ProfileAndUsersWorkflow(t *testing.T) {
 
 	// 5. Test Password update with correct current password
 	goodPassBody, _ := json.Marshal(ProfileUpdateRequest{
-		CurrentPassword: "admin123",
-		NewPassword:     "admin456",
+		CurrentPassword: "adminSecurePassword2026!",
+		NewPassword:     "newSecurePass2026!",
 	})
 	goodReq := httptest.NewRequest(http.MethodPost, "/api/profile", bytes.NewReader(goodPassBody))
 	goodReq.AddCookie(sessionCookie)
@@ -82,18 +90,17 @@ func TestApp_ProfileAndUsersWorkflow(t *testing.T) {
 	app.ProfileHandler(goodRec, goodReq)
 	assert.Equal(t, http.StatusOK, goodRec.Code)
 
-	// Restore password back to admin123 for other tests
-	resetPassBody, _ := json.Marshal(ProfileUpdateRequest{
-		CurrentPassword: "admin456",
-		NewPassword:     "admin123",
+	// 6. Test login with newly updated password
+	newLoginBody, _ := json.Marshal(LoginRequest{
+		Username: "admin_profile_test",
+		Password: "newSecurePass2026!",
 	})
-	resReq := httptest.NewRequest(http.MethodPost, "/api/profile", bytes.NewReader(resetPassBody))
-	resReq.AddCookie(sessionCookie)
-	resRec := httptest.NewRecorder()
-	app.ProfileHandler(resRec, resReq)
-	assert.Equal(t, http.StatusOK, resRec.Code)
+	req2 := httptest.NewRequest(http.MethodPost, "/api/login", bytes.NewReader(newLoginBody))
+	rec2 := httptest.NewRecorder()
+	app.LoginHandler(rec2, req2)
+	assert.Equal(t, http.StatusOK, rec2.Code)
 
-	// 6. GET /api/users
+	// 7. GET /api/users
 	usersReq := httptest.NewRequest(http.MethodGet, "/api/users", nil)
 	usersRec := httptest.NewRecorder()
 	app.UsersListHandler(usersRec, usersReq)
