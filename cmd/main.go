@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -27,20 +29,16 @@ func killProcessOnPort(port string) {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	cmd := exec.Command("cmd", "/c", "for /f \"tokens=5\" %a in ('netstat -ano ^| findstr :"+port+"') do taskkill /PID %a /F")
-	err := cmd.Run()
-	if err != nil {
-		cmd = exec.Command("powershell", "-command", "Get-Process -Id (Get-NetTCPConnection -LocalPort "+port+").OwningProcess | Stop-Process -Force")
-		err = cmd.Run()
-		if err != nil {
-			log.Printf("Warning: Could not kill process on port %s: %v", port, err)
-		} else {
-			log.Printf("Killed process on port %s", port)
-		}
-	} else {
-		log.Printf("Killed process on port %s", port)
+	// Check if port is already free
+	ln, err := net.Listen("tcp", ":"+port)
+	if err == nil {
+		_ = ln.Close()
+		return
 	}
-	time.Sleep(500 * time.Millisecond)
+
+	cmd := exec.Command("cmd", "/c", fmt.Sprintf("for /f \"tokens=5\" %%a in ('netstat -ano ^| findstr /r \":%s \"') do taskkill /PID %%a /F", port))
+	_ = cmd.Run()
+	time.Sleep(100 * time.Millisecond)
 }
 
 func makeServer(listenAddr string, encryptKey []byte, nodes ...string) *fileserver.FileServer {
@@ -51,6 +49,7 @@ func makeServer(listenAddr string, encryptKey []byte, nodes ...string) *fileserv
 	)
 
 	fileServerOpts := fileserver.ServerOpts{
+		ListenAddr:        listenAddr,
 		EncryptKey:        encryptKey,
 		StorageRoot:       strings.TrimPrefix(listenAddr, ":") + "_network",
 		PathTransformFunc: store.CASPathTransformFunc,
@@ -87,7 +86,7 @@ func main() {
 				log.Printf("Failed to start server %d: %v", index+1, err)
 			}
 		}(srv, i)
-		time.Sleep(1 * time.Second)
+		time.Sleep(200 * time.Millisecond)
 	}
 
 	// Connect to MySQL database
@@ -101,7 +100,24 @@ func main() {
 	mux := http.NewServeMux()
 	api.RegisterRoutes(mux, app)
 
-	mux.Handle("/", fs)
+	// Clean static router: serves index.html at root and matches clean routes (e.g. /dashboard -> dashboard.html)
+	staticHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if path == "/" {
+			http.ServeFile(w, r, filepath.Join(webDir, "index.html"))
+			return
+		}
+		cleanPath := filepath.Join(webDir, strings.TrimPrefix(path, "/"))
+		if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
+			if _, errHTML := os.Stat(cleanPath + ".html"); errHTML == nil {
+				http.ServeFile(w, r, cleanPath+".html")
+				return
+			}
+		}
+		fs.ServeHTTP(w, r)
+	})
+
+	mux.Handle("/", staticHandler)
 
 	httpServer := &http.Server{
 		Addr:    ":" + cfg.HTTPPort,

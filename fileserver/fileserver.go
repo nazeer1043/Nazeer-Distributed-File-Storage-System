@@ -2,8 +2,10 @@ package fileserver
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -48,6 +50,10 @@ func NewFileServer(opts ServerOpts) *FileServer {
 
 	if len(opts.ID) == 0 {
 		opts.ID = crypto.GenerateID()
+	}
+
+	if len(opts.ListenAddr) == 0 && opts.Transport != nil {
+		opts.ListenAddr = opts.Transport.Addr()
 	}
 
 	metaStore, err := NewMetadataStore(opts.StorageRoot)
@@ -257,13 +263,16 @@ func (s *FileServer) StoreWithMeta(key string, filename string, owner string, co
 	}
 
 	peers := s.getPeers()
+	hash := sha256.Sum256(data)
+	checksumStr := hex.EncodeToString(hash[:])
+
 	meta := &FileMeta{
 		Key:         key,
 		Filename:    filename,
 		Size:        int64(len(data)),
 		ContentType: contentType,
 		Owner:       owner,
-		Checksum:    crypto.HashKey(key),
+		Checksum:    checksumStr,
 		UploadTime:  time.Now(),
 		NodeID:      s.ListenAddr,
 		Replicas:    len(peers) + 1,
@@ -278,8 +287,8 @@ func (s *FileServer) StoreWithMeta(key string, filename string, owner string, co
 	if s.GDrive != nil && s.GDrive.Enabled {
 		encBuf := new(bytes.Buffer)
 		if _, encErr := crypto.CopyEncrypt(s.EncryptKey, bytes.NewReader(data), encBuf); encErr == nil {
-			if driveFile, gdriveErr := s.GDrive.UploadFile(key, filename, encBuf); gdriveErr == nil {
-				log.Printf("[%s] Google Drive Cloud Backup upload successful for (%s)! Drive File ID: %s\n", s.ListenAddr, filename, driveFile.Id)
+			if driveFileID, gdriveErr := s.GDrive.UploadFile(key, filename, encBuf); gdriveErr == nil {
+				log.Printf("[%s] Google Drive Cloud Backup upload successful for (%s)! Drive File ID: %s\n", s.ListenAddr, filename, driveFileID)
 			} else {
 				log.Printf("[%s] GDrive upload error for (%s): %v\n", s.ListenAddr, filename, gdriveErr)
 			}
@@ -399,6 +408,28 @@ func (s *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) e
 	peer.CloseStream()
 
 	return nil
+}
+
+// Delete purges a file by key locally and broadcasts MessageDeleteFile to all peer nodes.
+func (s *FileServer) Delete(key string) error {
+	log.Printf("[%s] deleting file (%s) locally and broadcasting to network...\n", s.Transport.Addr(), key)
+	_ = s.Storage.Delete(s.ID, key)
+	if s.Metadata != nil {
+		_ = s.Metadata.Delete(key)
+	}
+	if s.GDrive != nil && s.GDrive.Enabled {
+		go func(k string) {
+			_ = s.GDrive.DeleteFile(k)
+		}(key)
+	}
+
+	msg := Message{
+		Payload: MessageDeleteFile{
+			ID:  s.ID,
+			Key: key,
+		},
+	}
+	return s.broadcast(&msg)
 }
 
 func (s *FileServer) handleMessageDeleteFile(from string, msg MessageDeleteFile) error {

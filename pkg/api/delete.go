@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
@@ -32,17 +33,39 @@ func (a *App) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Resolve actual target storage key if filename was provided
+	targetKey := key
+	targetFilename := key
+
 	for _, srv := range a.Servers {
-		if srv != nil {
-			_ = srv.Storage.Delete(srv.ID, key)
-			if srv.Metadata != nil {
-				_ = srv.Metadata.Delete(key)
+		if srv != nil && srv.Metadata != nil {
+			if meta, ok := srv.Metadata.Get(key); ok {
+				targetKey = meta.Key
+				targetFilename = meta.Filename
+				break
+			}
+			for _, m := range srv.Metadata.List() {
+				if m.Filename == key || m.Key == key {
+					targetKey = m.Key
+					targetFilename = m.Filename
+					break
+				}
 			}
 		}
 	}
 
+	// Delete locally and broadcast P2P deletion across all nodes and GDrive
+	for _, srv := range a.Servers {
+		if srv != nil {
+			_ = srv.Delete(targetKey)
+		}
+	}
+
+	LogEvent("WARN", fmt.Sprintf("File '%s' (key: %s) permanently deleted from cluster", targetFilename, targetKey))
+
 	if a.DB != nil {
-		_ = a.DB.DeleteFileRecord(key)
+		_ = a.DB.DeleteFileRecord(targetKey)
+		a.DB.InsertAuditLog("WARN", a.Servers[0].ListenAddr, fmt.Sprintf("File '%s' (key: %s) purged from cluster", targetFilename, targetKey))
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -51,4 +74,5 @@ func (a *App) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		Message: "File successfully purged from all cluster storage nodes.",
 	})
 }
+
 

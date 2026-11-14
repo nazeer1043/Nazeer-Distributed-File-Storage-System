@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -54,8 +55,16 @@ func (a *App) NodesHandler(w http.ResponseWriter, r *http.Request) {
 			role = "Bootstrap Leader"
 		}
 
-		nodeID := fmt.Sprintf("node-%s", srv.ListenAddr[1:])
-		nodeName := fmt.Sprintf("Node %s (%s)", srv.ListenAddr[1:], role)
+		addr := srv.ListenAddr
+		if addr == "" && srv.Transport != nil {
+			addr = srv.Transport.Addr()
+		}
+		if addr == "" {
+			addr = fmt.Sprintf(":%d", 3000+i*1000)
+		}
+		cleanAddr := strings.TrimPrefix(addr, ":")
+		nodeID := fmt.Sprintf("node-%s", cleanAddr)
+		nodeName := fmt.Sprintf("Node %s (%s)", cleanAddr, role)
 
 		nodes = append(nodes, NodeInfo{
 			ID:       nodeID,
@@ -70,6 +79,10 @@ func (a *App) NodesHandler(w http.ResponseWriter, r *http.Request) {
 			Latency:  "1ms",
 			Replicas: fileCount,
 		})
+
+		if a.DB != nil && a.DB.Active {
+			_ = a.DB.UpsertNodeRecord(nodeID, nodeName, srv.ListenAddr, role, "Online", 4398046511104, nodeBytes)
+		}
 	}
 
 	json.NewEncoder(w).Encode(nodes)

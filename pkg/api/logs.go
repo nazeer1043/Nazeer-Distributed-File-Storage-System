@@ -40,6 +40,10 @@ func LogEvent(level, message string) {
 	if len(globalLogBuffer.entries) > globalLogBuffer.maxSize {
 		globalLogBuffer.entries = globalLogBuffer.entries[1:]
 	}
+
+	if defaultApp != nil && defaultApp.DB != nil && defaultApp.DB.Active {
+		defaultApp.DB.InsertAuditLog(level, "cluster", message)
+	}
 }
 
 func (a *App) LogsHandler(w http.ResponseWriter, r *http.Request) {
@@ -54,6 +58,19 @@ func (a *App) LogsHandler(w http.ResponseWriter, r *http.Request) {
 	logs := make([]LogEntry, len(globalLogBuffer.entries))
 	copy(logs, globalLogBuffer.entries)
 	globalLogBuffer.mu.RUnlock()
+
+	// If in-memory buffer is empty, query historical audit logs from MySQL
+	if len(logs) == 0 && a.DB != nil && a.DB.Active {
+		if dbLogs, err := a.DB.GetAuditLogs(50); err == nil && len(dbLogs) > 0 {
+			for _, l := range dbLogs {
+				logs = append(logs, LogEntry{
+					Timestamp: l.Timestamp,
+					Level:     l.Level,
+					Message:   l.Message,
+				})
+			}
+		}
+	}
 
 	if len(logs) == 0 {
 		now := time.Now().Format("15:04:05")

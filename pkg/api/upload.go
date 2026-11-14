@@ -1,9 +1,12 @@
 package api
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -57,11 +60,45 @@ func (a *App) UploadHandler(w http.ResponseWriter, r *http.Request) {
 		owner = "System Admin"
 	}
 
-	// Generate deterministic storage key from filename hash
-	keyHash := sha256.Sum256([]byte(header.Filename))
-	key := hex.EncodeToString(keyHash[:16])
+	// Compute Content-Addressable Storage (CAS) key from filename, owner, and payload
+	var reader io.Reader = file
+	hasher := sha256.New()
+	hasher.Write([]byte(header.Filename + ":" + owner + ":"))
 
-	meta, err := a.Servers[0].StoreWithMeta(key, header.Filename, owner, header.Header.Get("Content-Type"), file)
+	if seeker, ok := file.(io.Seeker); ok {
+		if _, err := io.Copy(hasher, file); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(UploadResponse{
+				Success: false,
+				Message: "Failed to read upload payload: " + err.Error(),
+			})
+			return
+		}
+		if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(UploadResponse{
+				Success: false,
+				Message: "Failed to rewind payload stream: " + err.Error(),
+			})
+			return
+		}
+	} else {
+		data, err := io.ReadAll(file)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(UploadResponse{
+				Success: false,
+				Message: "Failed to read upload payload: " + err.Error(),
+			})
+			return
+		}
+		hasher.Write(data)
+		reader = bytes.NewReader(data)
+	}
+
+	key := hex.EncodeToString(hasher.Sum(nil)[:16])
+
+	meta, err := a.Servers[0].StoreWithMeta(key, header.Filename, owner, header.Header.Get("Content-Type"), reader)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(UploadResponse{
@@ -71,8 +108,11 @@ func (a *App) UploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	LogEvent("INFO", fmt.Sprintf("File '%s' stored in CAS with key %s and replicated across cluster", meta.Filename, meta.Key))
+
 	if a.DB != nil {
 		_ = a.DB.SaveFileRecord(meta)
+		a.DB.InsertAuditLog("INFO", a.Servers[0].ListenAddr, fmt.Sprintf("Uploaded file '%s' (%d bytes, key: %s)", meta.Filename, meta.Size, meta.Key))
 	}
 
 	w.WriteHeader(http.StatusOK)

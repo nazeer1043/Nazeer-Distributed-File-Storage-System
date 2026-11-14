@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
@@ -33,20 +34,26 @@ func (a *App) FilesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var result []FileItem
+	seenKeys := make(map[string]bool)
 	idCounter := 1
 
 	for _, srv := range a.Servers {
 		if srv != nil && srv.Metadata != nil {
 			metaList := srv.Metadata.List()
 			for _, m := range metaList {
+				if seenKeys[m.Key] {
+					continue
+				}
+				seenKeys[m.Key] = true
+
 				sizeMB := float64(m.Size) / (1024 * 1024)
 				sizeStr := "0 B"
 				if sizeMB >= 1024 {
-					sizeStr = formatFloat(sizeMB/1024, "GB")
+					sizeStr = fmt.Sprintf("%.2f GB", sizeMB/1024)
 				} else if sizeMB >= 1 {
-					sizeStr = formatFloat(sizeMB, "MB")
+					sizeStr = fmt.Sprintf("%.1f MB", sizeMB)
 				} else if m.Size > 0 {
-					sizeStr = formatFloat(float64(m.Size)/1024, "KB")
+					sizeStr = fmt.Sprintf("%.1f KB", float64(m.Size)/1024)
 				}
 
 				result = append(result, FileItem{
@@ -73,6 +80,54 @@ func (a *App) FilesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// If local metadata is empty, fallback to querying MySQL records
+	if len(result) == 0 && a.DB != nil && a.DB.Active {
+		if dbFiles, err := a.DB.GetFileRecords(); err == nil {
+			for _, m := range dbFiles {
+				if seenKeys[m.Key] {
+					continue
+				}
+				seenKeys[m.Key] = true
+
+				sizeMB := float64(m.Size) / (1024 * 1024)
+				sizeStr := "0 B"
+				if sizeMB >= 1024 {
+					sizeStr = fmt.Sprintf("%.2f GB", sizeMB/1024)
+				} else if sizeMB >= 1 {
+					sizeStr = fmt.Sprintf("%.1f MB", sizeMB)
+				} else if m.Size > 0 {
+					sizeStr = fmt.Sprintf("%.1f KB", float64(m.Size)/1024)
+				}
+
+				nodeAddr := ":3000"
+				if len(a.Servers) > 0 {
+					nodeAddr = a.Servers[0].ListenAddr
+				}
+
+				result = append(result, FileItem{
+					ID:         idCounter,
+					Name:       m.Filename,
+					Size:       sizeStr,
+					RawSize:    m.Size,
+					Category:   "Documents",
+					Owner:      m.Owner,
+					Node:       nodeAddr,
+					NodeColor:  "text-brand-500 bg-brand-500/10",
+					Replicas:   "3/3",
+					Status:     "Healthy",
+					Modified:   m.UploadTime.Format("2006-01-02 15:04"),
+					Icon:       "file-text",
+					IconColor:  "text-brand-500",
+					Checksum:   m.Checksum,
+					Encryption: "AES-256-GCM",
+					Downloads:  "0",
+					Location:   m.Key,
+				})
+				idCounter++
+			}
+		}
+	}
+
 	if result == nil {
 		result = []FileItem{}
 	}
@@ -80,39 +135,3 @@ func (a *App) FilesHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
-func formatFloat(v float64, unit string) string {
-	return jsonNumber(v) + " " + unit
-}
-
-func jsonNumber(v float64) string {
-	return httpStatusStr(v)
-}
-
-func httpStatusStr(v float64) string {
-	return sprintf("%.1f", v)
-}
-
-func sprintf(format string, a ...interface{}) string {
-	return jsonMarshal(format, a...)
-}
-
-func jsonMarshal(format string, a ...interface{}) string {
-	if len(a) > 0 {
-		if f, ok := a[0].(float64); ok {
-			return intToStr(int(f)) + "." + intToStr(int(f*10)%10)
-		}
-	}
-	return "0.0"
-}
-
-func intToStr(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	b := []byte{}
-	for n > 0 {
-		b = append([]byte{byte('0' + n%10)}, b...)
-		n /= 10
-	}
-	return string(b)
-}

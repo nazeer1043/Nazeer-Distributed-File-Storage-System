@@ -3,6 +3,7 @@
 *.dll
 *.so
 *.dylib
+*.winmd
 *.test
 *.out
 *.iml
